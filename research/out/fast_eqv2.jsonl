@@ -1,0 +1,7 @@
+{"mof": "CITZIP_manual", "gas": "CO2", "name": "CITZIP_manual_w_CO2_1", "natoms": 76, "y_relaxed": -0.2931850399999121, "y_init": -0.24071168000000398, "pred": -0.16021527349948883}
+{"mof": "CITZIP_manual", "gas": "CO2", "name": "CITZIP_manual_w_CO2_2", "natoms": 76, "y_relaxed": -0.14470998999991025, "y_init": -0.12105803999997988, "pred": -0.08772322535514832}
+{"mof": "CITZIP_manual", "gas": "CO2", "name": "CITZIP_manual_w_CO2_3", "natoms": 76, "y_relaxed": -0.16239487999985158, "y_init": -0.1523147999999992, "pred": -0.04646509885787964}
+{"mof": "CITZIP_manual", "gas": "CO2", "name": "CITZIP_manual_w_CO2_4", "natoms": 76, "y_relaxed": -0.28918013999998493, "y_init": -0.14834521999989647, "pred": -0.10790786147117615}
+{"mof": "CUKXAJ", "gas": "CO2", "name": "CUKXAJ_w_CO2_1", "natoms": 175, "y_relaxed": 0.06046912999977394, "y_init": 0.08357296999997743, "pred": 0.3257547616958618}
+{"mof": "CUKXAJ", "gas": "CO2", "name": "CUKXAJ_w_CO2_2", "natoms": 175, "y_relaxed": 0.10818541000003279, "y_init": 0.18030634000001555, "pred": 0.5696831345558167}
+{"mof": "CUKXAJ", "gas": "CO2", "name": "CUKXAJ_w_CO2_3", "natoms": 175, "y_relaxed": 0.04194547999986753, "y_init": 0.3056414099999074, "pred": 0.5106070637702942}

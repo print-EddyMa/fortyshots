@@ -1,0 +1,14 @@
+data/_build/
+logs/
+*.tar.gz
+*.pt
+*.gguf
+*.lmdb
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+web/dist/
+cassettes/*.local.jsonl
+.DS_Store
