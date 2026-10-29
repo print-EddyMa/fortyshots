@@ -1,0 +1,9 @@
+{
+ "built": "2026-10-29T19:09:15.047Z",
+ "sources": {
+  "runs": "web/fixtures/runs (mock)",
+  "results.json": "results/results.json",
+  "pools.json": "results/pools.json",
+  "structures": "data/structures (all)"
+ }
+}

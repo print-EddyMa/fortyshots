@@ -1,0 +1,29 @@
+{
+  "name": "fortyshots-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "fixtures": "../.venv/bin/python scripts/make_fixtures.py",
+    "dev": "node scripts/copy-data.mjs --public && vite",
+    "build": "tsc --noEmit && vite build && node scripts/copy-data.mjs",
+    "preview": "node scripts/serve.mjs",
+    "stub": "node scripts/stub-live.mjs",
+    "verify": "node scripts/verify.mjs",
+    "og": "node scripts/og.mjs"
+  },
+  "dependencies": {
+    "3dmol": "2.4.2",
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "4.7.0",
+    "typescript": "5.9.3",
+    "vite": "5.4.21"
+  }
+}

@@ -1,0 +1,136 @@
+{
+ "at": "2026-10-29T19:10:46.991Z",
+ "showcase": "mock-A5-P1-s0-202610291830",
+ "results": [
+  {
+   "name": "no console errors: landing @1440",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no console errors: console @1440",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no console errors: results @1440",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no console errors: runs @1440",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no console errors: method @1440",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no horizontal scroll: landing @390",
+   "ok": true,
+   "detail": "390/390"
+  },
+  {
+   "name": "no console errors: landing @390",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no horizontal scroll: console @390",
+   "ok": true,
+   "detail": "390/390"
+  },
+  {
+   "name": "no console errors: console @390",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no horizontal scroll: results @390",
+   "ok": true,
+   "detail": "390/390"
+  },
+  {
+   "name": "no console errors: results @390",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no horizontal scroll: runs @390",
+   "ok": true,
+   "detail": "390/390"
+  },
+  {
+   "name": "no console errors: runs @390",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "no horizontal scroll: method @390",
+   "ok": true,
+   "detail": "390/390"
+  },
+  {
+   "name": "no console errors: method @390",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "console replays at 32x to completion",
+   "ok": true,
+   "detail": "15.8 s, lookups 40 / 40"
+  },
+  {
+   "name": "console: no errors during replay",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "morph plays on reveal",
+   "ok": true,
+   "detail": "m858b58a · C24H9O8Zn2 · 175 atoms · DFT-relaxed geometry, ODAC23"
+  },
+  {
+   "name": "trace shows report, claimcheck, summary; flags in --fail; error events visible",
+   "ok": true,
+   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793301034524\",\"caption\":\"m858b58a · C24H9O8Zn2 · 175 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":1,\"errorItems\":1}"
+  },
+  {
+   "name": "queue (static): j/r/a marks 2 picks, sends one reject decision, saved locally",
+   "ok": true,
+   "detail": "Reject 2, keep 8 -> rejected 2 in this browser"
+  },
+  {
+   "name": "queue: no console errors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "results: re-roll A0/A1/A2 under 1 s",
+   "ok": true,
+   "detail": "48 ms incl. render"
+  },
+  {
+   "name": "live: events stream over SSE",
+   "ok": true,
+   "detail": "live · batch awaiting approval, 7 trace items"
+  },
+  {
+   "name": "live: queue POSTs one decision per round to /api/runs/<id>/human",
+   "ok": true,
+   "detail": "[{\"round\":1,\"action\":\"approve\",\"ids\":[],\"note\":\"approve from the console\"},{\"round\":2,\"action\":\"reject\",\"ids\":[\"m952c191\"],\"note\":\"reject from the console\"}]"
+  },
+  {
+   "name": "live: decisions come back through the ledger stream",
+   "ok": true,
+   "detail": "Human gateapprove18:32:51approve 10 · approve from the console | Human gatereject18:35:38reject 1 · reject from the console"
+  },
+  {
+   "name": "live: no console errors",
+   "ok": true,
+   "detail": ""
+  }
+ ]
+}

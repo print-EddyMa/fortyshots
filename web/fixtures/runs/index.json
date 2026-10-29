@@ -1,0 +1,99 @@
+[
+ {
+  "run_id": "mock-A5-P1-s0-202610291859",
+  "arm": "A5",
+  "pool": "P1",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 2,
+  "spent": 40,
+  "duration_s": 3.6,
+  "started": "2026-10-29T18:59:17.218Z",
+  "model": "muse-glimmer-30b-mock"
+ },
+ {
+  "run_id": "mock-A5-P1-s0-202610291830",
+  "arm": "A5",
+  "pool": "P1",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 5,
+  "spent": 40,
+  "duration_s": 723,
+  "started": "2026-10-29T18:30:00Z",
+  "model": "muse-glimmer-30b",
+  "showcase": true
+ },
+ {
+  "run_id": "mock-A5-P2-s0-202610291845",
+  "arm": "A5",
+  "pool": "P2",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 4,
+  "spent": 40,
+  "duration_s": 647,
+  "started": "2026-10-29T18:45:02Z",
+  "model": "muse-glimmer-30b"
+ },
+ {
+  "run_id": "mock-A5-P3-s0-202610291858",
+  "arm": "A5",
+  "pool": "P3",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 5,
+  "spent": 40,
+  "duration_s": 663,
+  "started": "2026-10-29T18:58:49Z",
+  "model": "muse-glimmer-30b"
+ },
+ {
+  "run_id": "mock-A6-P1-s0-202610291912",
+  "arm": "A6",
+  "pool": "P1",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 3,
+  "spent": 40,
+  "duration_s": 596,
+  "started": "2026-10-29T19:12:51Z",
+  "model": "muse-glimmer-30b"
+ },
+ {
+  "run_id": "mock-A6-P2-s0-202610291925",
+  "arm": "A6",
+  "pool": "P2",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 2,
+  "spent": 40,
+  "duration_s": 664,
+  "started": "2026-10-29T19:25:47Z",
+  "model": "muse-glimmer-30b"
+ },
+ {
+  "run_id": "mock-A4-P1-s0-202610291939",
+  "arm": "A4",
+  "pool": "P1",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 2,
+  "spent": 40,
+  "duration_s": 95,
+  "started": "2026-10-29T19:39:50Z",
+  "model": "muse-glimmer-30b"
+ },
+ {
+  "run_id": "mock-A4-P2-s0-202610291944",
+  "arm": "A4",
+  "pool": "P2",
+  "seed": 0,
+  "mode": "mock",
+  "hits": 1,
+  "spent": 40,
+  "duration_s": 100,
+  "started": "2026-10-29T19:44:25Z",
+  "model": "muse-glimmer-30b"
+ }
+]

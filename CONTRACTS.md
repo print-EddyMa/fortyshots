@@ -102,7 +102,7 @@ IDs look like `m` plus 7 hex characters, for example `m3fa9c2e`. They are salted
 | `fortyshots doctor --base-url http://127.0.0.1:8080 --out doctor/report.json` | Model round trips: tools, json_schema, vision, reasoning budget, tok/s, cold and warm prefill |
 | `fortyshots run --arm A5 --pool P1 --seed 0 [--base-url URL] [--mode recorded\|live\|mock] [--action-mode native\|schema] [--max-minutes 45] [--runs-dir runs]` | One campaign; arms are A4, A5, A6, L and L2 |
 | `fortyshots record mac/plans/<name>.json [--base-url URL]` | Runs a list of `{arm, pool, seed}`; skips finished run ids; resumes unfinished ones |
-| `fortyshots serve --port 7777 [--runs-dir runs] [--site web/dist]` | Live mode: static site plus `GET /api/runs`, `GET /api/runs/<id>/events` (SSE tail), `POST /api/runs/<id>/human` |
+| `fortyshots serve --port 7777 [--runs-dir runs] [--site docs]` | Live mode: static site plus `GET /api/runs`, `GET /api/runs/<id>/events` (SSE tail), `POST /api/runs/<id>/human` |
 | `fortyshots index` | Rebuilds `runs/index.json` |
 | `fortyshots verify` | Recomputes every number in `results/results.json` from `runs/` and `data/` with no model, and diffs the result against the committed file |
 
@@ -141,3 +141,5 @@ IDs look like `m` plus 7 hex characters, for example `m3fa9c2e`. They are salted
 - **Extra `run` flags.** `--resume`, `--run-id`, `--rounds N` (the budget becomes 10·N), `--no-vision`, `--shared-tools`, `--cassette off|record|replay`, `--cassette-from`, `--chemist`, `--data-dir` and `--doctor-report`.
 - **Plan files.** Either `{defaults?, runs: [{arm, pool, seed, ...}]}` or a bare list.
 - **Leak AUC.** Compute it from `summary.leak` or `summary.ranking`, not from `picks`.
+- **`runs/index.json` entries.** Optional fields `showcase: bool` and `goal: str`. The showcase run is the median A5 run on P1, chosen by the PREREG rule; if no run is marked, the web falls back to the first A5 run on P1.
+- **`results/pools.json` rows.** Optional field `metal_density` (`n_metal_atoms / volume_A3 × 1000`). Rows may use either `cost_tier` or `metal_cost_tier`.
