@@ -2,16 +2,28 @@
 import base64
 import ipaddress
 import json
+import os
+import re
+import statistics
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
 
-from .cassette import Cassette
+from .cassette import Cassette, canonical
 
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 MODEL_ALIAS = "muse-glimmer-30b"
+MIN_TIMEOUT_S = 300.0          # floor of the per-call read timeout
+DEFAULT_DECODE_TPS = 8.0       # assumed decode speed when doctor/report.json has none (measured: ~11-13 tok/s)
+DEFAULT_PREFILL_TPS = 100.0    # assumed cold prefill speed when doctor/report.json has none
+PREFILL_BASE_S = 30.0          # fixed part of the prefill allowance (slot setup, image encoding)
+IMAGE_TOKENS = 1024            # prompt tokens charged per image when estimating prefill
+DECODE_SLACK = 1.5             # the generation may run this much slower than measured
+TIMEOUT_ENV = "FORTYSHOTS_TIMEOUT_S"
+CONTEXT_OVERFLOW = re.compile(r"context", re.IGNORECASE)
 
 
 class NonLoopbackError(ValueError):
@@ -20,6 +32,31 @@ class NonLoopbackError(ValueError):
 
 class LLMError(RuntimeError):
     pass
+
+
+class ContextOverflow(LLMError):
+    """llama-server refused the prompt because it does not fit n_ctx (HTTP 400, "exceeds the available context
+    size"). Deterministic for a given prompt, so the caller shrinks the prompt instead of resending it."""
+
+
+def doctor_speeds(report: str | os.PathLike | None) -> dict:
+    """{decode_tps, prefill_tps} measured by `fortyshots doctor` (None for each one the report lacks)."""
+    out = {"decode_tps": None, "prefill_tps": None}
+    if not report or not Path(report).exists():
+        return out
+    try:
+        rep = json.loads(Path(report).read_text())
+    except (OSError, json.JSONDecodeError):
+        return out
+    thr = next((c.get("detail") or {} for c in rep.get("checks") or [] if c.get("name") == "throughput"), {})
+    dec = thr.get("decode_tok_s") or rep.get("decode_tok_s")
+    if isinstance(dec, (int, float)) and dec > 0:
+        out["decode_tps"] = float(dec)
+    pps = [((r or {}).get("cold") or {}).get("prompt_per_second") for r in (thr.get("roles") or {}).values()]
+    pps = [float(v) for v in pps if isinstance(v, (int, float)) and v > 0]
+    if pps:
+        out["prefill_tps"] = statistics.median(pps)
+    return out
 
 
 def assert_loopback(base_url: str) -> str:
@@ -124,10 +161,16 @@ def parse_response(data: dict) -> LLMResult:
 
 
 class LLMClient:
-    def __init__(self, base_url: str, *, timeout: float = 300.0, retries: int = 3, cassette: Cassette | None = None,
-                 transport: httpx.BaseTransport | None = None, model: str = MODEL_ALIAS):
+    def __init__(self, base_url: str, *, timeout: float = MIN_TIMEOUT_S, retries: int = 3,
+                 cassette: Cassette | None = None, transport: httpx.BaseTransport | None = None,
+                 model: str = MODEL_ALIAS, decode_tps: float | None = None, prefill_tps: float | None = None):
+        """`timeout` is the floor of the per-call read timeout; see timeout_for()."""
         self.base_url = assert_loopback(base_url)
         self.timeout = timeout
+        self.decode_tps = decode_tps or DEFAULT_DECODE_TPS
+        self.prefill_tps = prefill_tps or DEFAULT_PREFILL_TPS
+        env = os.environ.get(TIMEOUT_ENV, "").strip()
+        self.timeout_override = float(env) if env else None
         self.retries = retries
         self.cassette = cassette or Cassette(None, "off")
         self.model = model
@@ -152,6 +195,22 @@ class LLMClient:
             req["seed"] = seed
         return req
 
+    def timeout_for(self, request: dict) -> float:
+        """Read timeout for one non-streaming call: max(floor, prefill allowance + max_tokens / tok_s * 1.5).
+
+        The prefill allowance is PREFILL_BASE_S plus the estimated prompt tokens (characters / 3, plus IMAGE_TOKENS
+        per image) at the measured cold prefill speed. FORTYSHOTS_TIMEOUT_S replaces the whole formula."""
+        if self.timeout_override:
+            return self.timeout_override
+        canon = canonical(request)
+        n_images = sum(1 for m in canon.get("messages") or [] if isinstance(m.get("content"), list)
+                       for p in m["content"] if p.get("type") == "image_url")
+        prompt_tokens = len(json.dumps(canon.get("messages") or []) + json.dumps(canon.get("tools") or [])) / 3
+        prompt_tokens += IMAGE_TOKENS * n_images
+        prefill = PREFILL_BASE_S + prompt_tokens / self.prefill_tps
+        decode = int(request.get("max_tokens") or 2048) / self.decode_tps * DECODE_SLACK
+        return round(max(self.timeout, prefill + decode), 1)
+
     def chat(self, messages: list[dict], **kw) -> LLMResult:
         return self.send(self.build_request(messages, **kw))
 
@@ -165,21 +224,24 @@ class LLMClient:
             res.dur_ms = int((cached.get("timings") or {}).get("prompt_ms", 0) + (cached.get("timings") or {}).get(
                 "predicted_ms", 0))
             return res
-        data = self._post("/v1/chat/completions", request)
+        data = self._post("/v1/chat/completions", request, timeout=self.timeout_for(request))
         res = parse_response(data)
         res.dur_ms = int((time.monotonic() - t0) * 1000)
         self.cassette.record(request, data)
         return res
 
-    def _post(self, path: str, body: dict) -> dict:
+    def _post(self, path: str, body: dict, timeout: float | None = None) -> dict:
         delay = 1.0
+        timeout = timeout or self.timeout
         for attempt in range(self.retries + 1):
             try:
-                r = self.http.post(path, json=body)
+                r = self.http.post(path, json=body, timeout=httpx.Timeout(timeout, connect=10.0))
                 if r.status_code == 503 and attempt < self.retries:  # model still loading
                     time.sleep(delay)
                     delay *= 2
                     continue
+                if r.status_code in (400, 413) and CONTEXT_OVERFLOW.search(r.text):
+                    raise ContextOverflow(f"HTTP {r.status_code} from {path}: {r.text[:300]}")
                 if r.status_code >= 400:
                     raise LLMError(f"HTTP {r.status_code} from {path}: {r.text[:300]}")
                 return r.json()
@@ -189,7 +251,7 @@ class LLMClient:
                 time.sleep(delay)
                 delay *= 2
             except httpx.TimeoutException as e:
-                raise LLMError(f"timeout after {self.timeout:.0f}s on {path}") from e
+                raise LLMError(f"timeout after {timeout:.0f}s on {path}") from e
         raise LLMError("unreachable")
 
     def get(self, path: str, timeout: float = 10.0) -> httpx.Response:

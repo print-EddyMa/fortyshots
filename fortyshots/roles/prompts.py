@@ -51,6 +51,9 @@ Commit exactly {n} MOFs to buy with DFT now. Choose unbought ids that appear in 
 p_hit, your probability from 0 to 1 that DFT will call it a hit; p_hit is scored against the outcome, so state what \
 you actually believe. Add a one-sentence rationale and the call ids of the evidence. Reply with JSON only."""
 
+PROPOSER_SHORT = """
+Keep each rationale to 20 words or fewer."""
+
 PROPOSER_RETRY = """That reply was not a valid batch: {error}
 Reply again with JSON only: exactly {n} picks, unique unbought ids from the allowed list."""
 

@@ -72,7 +72,13 @@ def git_sha() -> str | None:
     return _run(["git", "rev-parse", "HEAD"])
 
 
-def prereg_sha(path: Path = Path("PREREG.md")) -> str | None:
+REPO_ROOT = Path(__file__).resolve().parent.parent
+PREREG_PATH = REPO_ROOT / "PREREG.md"
+
+
+def prereg_sha(path: Path | None = None) -> str | None:
+    """sha256 of PREREG.md at the repo root (the package's parent), whatever the working directory."""
+    path = Path(path) if path else PREREG_PATH
     return sha256_file(path) if path.exists() else None
 
 

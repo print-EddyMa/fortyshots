@@ -2,11 +2,17 @@
 
 The policy reads only the request: role instruction, offered tools, tool results already in the messages, and the
 requested schema. It never reads labels; a given request always yields the same response.
+
+Test hooks (off by default) simulate two llama-server failure modes: `n_ctx` answers HTTP 400 "exceeds the available
+context size" for prompts larger than n_ctx tokens, and `reasoning_tokens` ({strength: tokens}) forces the reasoning of
+that strength to a fixed length, so a long think can hit max_tokens and come back as finish_reason=length with empty
+content. The mock server reads them from FORTYSHOTS_MOCK_N_CTX and FORTYSHOTS_MOCK_REASONING_TOKENS (JSON).
 """
 import base64
 import hashlib
 import io
 import json
+import os
 import random
 import re
 
@@ -338,22 +344,58 @@ def _tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-def respond(req: dict) -> dict:
-    """One /v1/chat/completions response for a request dict."""
+class MockHTTPError(Exception):
+    """An error answer of the fake server (status code plus llama-server's JSON error body)."""
+
+    def __init__(self, status: int, body: dict):
+        super().__init__(f"HTTP {status}: {body}")
+        self.status, self.body = status, body
+
+
+def prompt_tokens(req: dict) -> int:
+    msgs = req.get("messages") or []
+    n_img = sum(len(_images(m)) for m in msgs)
+    return _tokens(json.dumps([_text(m) for m in msgs])) + 256 * n_img + 40 * len(req.get("tools") or [])
+
+
+def context_error(n_prompt: int, n_ctx: int) -> dict:
+    return {"error": {"code": 400, "type": "exceed_context_size_error", "n_prompt_tokens": n_prompt, "n_ctx": n_ctx,
+                      "message": "the request exceeds the available context size, try increasing it"}}
+
+
+def env_hooks() -> dict:
+    """Test hooks for the mock server process, from the environment."""
+    hooks = {}
+    if os.environ.get("FORTYSHOTS_MOCK_N_CTX"):
+        hooks["n_ctx"] = int(os.environ["FORTYSHOTS_MOCK_N_CTX"])
+    if os.environ.get("FORTYSHOTS_MOCK_REASONING_TOKENS"):
+        hooks["reasoning_tokens"] = json.loads(os.environ["FORTYSHOTS_MOCK_REASONING_TOKENS"])
+    return hooks
+
+
+def respond(req: dict, *, n_ctx: int | None = None, reasoning_tokens: dict | None = None) -> dict:
+    """One /v1/chat/completions response for a request dict. Raises MockHTTPError when a test hook says so."""
+    if n_ctx is not None and prompt_tokens(req) > n_ctx:
+        raise MockHTTPError(400, context_error(prompt_tokens(req), n_ctx))
     pol = Policy(req)
     out = pol.respond()
     content, reasoning, calls = out.get("content"), out.get("reasoning", ""), out.get("tool_calls") or []
     max_tokens = int(req.get("max_tokens") or 4096)
-    r_tok = min(_tokens(reasoning), REASONING_BUDGET)
-    reasoning = reasoning[: r_tok * 4]
+    forced = (reasoning_tokens or {}).get(pol.strength)
+    if forced:
+        while _tokens(reasoning) < forced:
+            reasoning += " " + FILLER
+        r_tok, reasoning = int(forced), reasoning[: int(forced) * 4]
+    else:
+        r_tok = min(_tokens(reasoning), REASONING_BUDGET)
+        reasoning = reasoning[: r_tok * 4]
     v_tok = _tokens((content or "") + "".join(c["function"]["arguments"] for c in calls)) if (content or calls) else 0
     finish = "tool_calls" if calls else "stop"
     if r_tok + v_tok > max_tokens:
         reasoning, content, calls, finish = reasoning[: max_tokens * 4], "", [], "length"
         r_tok, v_tok = min(r_tok, max_tokens), 0
     msgs = req.get("messages") or []
-    n_img = sum(len(_images(m)) for m in msgs)
-    total_prompt = _tokens(json.dumps([_text(m) for m in msgs])) + 256 * n_img + 40 * len(pol.tools)
+    total_prompt = prompt_tokens(req)
     cache_n = min(total_prompt - 1, _tokens(json.dumps([_text(m) for m in msgs[:-1]]))) if len(msgs) > 1 else 0
     prompt_n = total_prompt - cache_n
     pps, tps = 180.0 + pol.rng.uniform(-10, 10), 12.5 + pol.rng.uniform(-1, 1)
@@ -387,6 +429,7 @@ def create_app():
 
     app = FastAPI(title="fortyshots mock llama-server")
     state = {"requests": 0}
+    hooks = env_hooks()
 
     @app.get("/health")
     def health():
@@ -412,20 +455,30 @@ def create_app():
 
     @app.post("/v1/chat/completions")
     async def chat(request: Request):
+        from fastapi.responses import JSONResponse
+
         state["requests"] += 1
-        return respond(await request.json())
+        try:
+            return respond(await request.json(), **hooks)
+        except MockHTTPError as e:
+            return JSONResponse(e.body, status_code=e.status)
 
     return app
 
 
-def transport():
-    """httpx transport that answers in-process, for tests and server-less mock runs."""
+def transport(**hooks):
+    """httpx transport that answers in-process, for tests and server-less mock runs (hooks: see respond())."""
     import httpx
+
+    hooks = hooks or env_hooks()
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
         if path == "/v1/chat/completions":
-            return httpx.Response(200, json=respond(json.loads(request.content)))
+            try:
+                return httpx.Response(200, json=respond(json.loads(request.content), **hooks))
+            except MockHTTPError as e:
+                return httpx.Response(e.status, json=e.body)
         if path == "/health":
             return httpx.Response(200, json={"status": "ok"})
         if path == "/props":

@@ -22,17 +22,22 @@ PAYLOAD_KEYS = {
     "calibration": {"n", "spearman", "auc", "image"}, "mutation": {"parent", "spec", "status", "note"},
     "report": {"text"}, "claimcheck": {"n_claims", "verified", "flagged"}, "error": {"where", "message", "recovered"},
     "summary": {"arm", "pool", "seed", "hits", "spent", "picks", "hit_flags", "lookups_to_first_hit", "brier",
-                "p_hits", "duration_s", "aborted", "autofill"},
+                "p_hits", "duration_s", "aborted", "autofill", "harness_picks", "harness_pick_ids"},
 }
 
 
 class MockTransport(httpx.MockTransport):
-    """In-process mock llama-server that records every chat request; `hook(req, resp)` may rewrite responses."""
+    """In-process mock llama-server that records every chat request; `hook(req, resp)` may rewrite responses,
+    return an httpx.Response (an HTTP error, say) or raise an httpx exception (a read timeout, say).
+    `n_ctx` and `reasoning_tokens` are mockllm's test hooks; `health` answers /health (False = server down)."""
 
-    def __init__(self, hook=None, fail_chat: bool = False):
+    def __init__(self, hook=None, fail_chat: bool = False, n_ctx: int | None = None,
+                 reasoning_tokens: dict | None = None, health=True):
         self.requests: list[dict] = []
         self.hook = hook
         self.fail_chat = fail_chat
+        self.health = health
+        self.hooks = {"n_ctx": n_ctx, "reasoning_tokens": reasoning_tokens}
         inner = mockllm.transport()
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -41,16 +46,25 @@ class MockTransport(httpx.MockTransport):
                     raise httpx.ConnectError("no network in this test")
                 req = json.loads(request.content)
                 self.requests.append(req)
-                resp = mockllm.respond(req)
+                try:
+                    resp = mockllm.respond(req, **self.hooks)
+                except mockllm.MockHTTPError as e:
+                    return httpx.Response(e.status, json=e.body)
                 if self.hook:
                     resp = self.hook(req, resp) or resp
+                if isinstance(resp, httpx.Response):
+                    return resp
                 return httpx.Response(200, json=resp)
+            if request.url.path == "/health" and not (self.health() if callable(self.health) else self.health):
+                raise httpx.ConnectError("server down in this test")
             return inner.handle_request(request)
         super().__init__(handler)
 
 
 def make_cfg(tmp_path: Path, arm: str = "A5", pool: str = "P0", seed: int = 0, **kw) -> RunConfig:
     kw.setdefault("runs_dir", tmp_path / "runs")
+    kw.setdefault("llm_backoff_s", 0.0)
+    kw.setdefault("llm_health_wait_s", 0.0)
     return RunConfig(arm=arm, pool=pool, seed=seed, mode=kw.pop("mode", "mock"), base_url=BASE_URL,
                      data_dir=FIXTURE_DATA, doctor_report=None, **kw)
 

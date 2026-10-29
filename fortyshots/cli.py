@@ -92,7 +92,8 @@ def cmd_run(args):
     print(f"{'resuming' if camp.resumed else 'starting'} {camp.run_id}", file=sys.stderr)
     summary = camp.run()
     build_index(cfg.runs_dir)
-    print(json.dumps({k: summary[k] for k in ("run_id", "hits", "spent", "duration_s", "aborted", "autofill")}))
+    print(json.dumps({k: summary[k] for k in ("run_id", "hits", "spent", "duration_s", "aborted", "autofill",
+                                              "harness_picks")}))
 
 
 def cmd_record(args):

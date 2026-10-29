@@ -150,8 +150,38 @@ machine_ram_gb() {
 }
 machine_os() { if is_mac; then echo "macOS $(sw_vers -productVersion 2>/dev/null)"; else uname -sr; fi; }
 
+# The llama.cpp build number from `llama-server --version`: "version: 11960 (abc1234)" or a tag like "b11960".
+# Prints nothing when there is none (for example a semantic version such as "version: 0.8.0"); callers then treat
+# the build as unknown but acceptable.
 llama_build() {
-  llama-server --version 2>&1 | sed -n 's/.*version: *\([0-9][0-9]*\).*/\1/p' | head -n 1
+  llama-server --version 2>&1 | awk '
+    {
+      line = " " $0
+      if (match(line, /version: *[0-9]+/)) {
+        num = substr(line, RSTART, RLENGTH); sub(/^version: */, "", num)
+        if (substr(line, RSTART + RLENGTH, 1) !~ /[A-Za-z0-9.]/) { print num; exit }
+      }
+      while (match(line, /[^A-Za-z0-9]b[0-9][0-9][0-9][0-9]+/)) {
+        num = substr(line, RSTART + 2, RLENGTH - 2)
+        if (substr(line, RSTART + RLENGTH, 1) !~ /[A-Za-z0-9.]/) { print num; exit }
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }'
+}
+
+llama_version_line() { llama-server --version 2>&1 | awk 'NF {print; exit}'; }
+
+# Dies when the installed llama.cpp build is known and older than MIN_LLAMA_BUILD; warns when it is unknown.
+check_llama_build() {
+  local b; b="$(llama_build)"
+  if [ -z "$b" ]; then
+    warn "Could not read a llama.cpp build number ($(llama_version_line)); assuming it is $MIN_LLAMA_BUILD or newer."
+    return 0
+  fi
+  if [ "$b" -lt "$MIN_LLAMA_BUILD" ]; then
+    die "llama.cpp build $b is too old for Muse Glimmer (needs $MIN_LLAMA_BUILD or newer)." "brew upgrade llama.cpp"
+  fi
+  LLAMA_BUILD="$b"
 }
 
 # "on" / "off" / "unknown". Honest network state for run logs; only "off" may be described as Wi-Fi off.
@@ -381,10 +411,7 @@ cmd_model() {
   else
     check_platform
     need_cmd llama-server llama.cpp
-    local b; b="$(llama_build)"
-    if [ -n "$b" ] && [ "$b" -lt "$MIN_LLAMA_BUILD" ]; then
-      die "llama.cpp build $b is too old for Muse Glimmer (needs $MIN_LLAMA_BUILD or newer)." "brew upgrade llama.cpp"
-    fi
+    check_llama_build
     check_files "$prof"
     ensure_wired
     local a
@@ -1170,11 +1197,9 @@ cmd_setup() {
       fi
     fi
     if have llama-server; then
-      b="$(llama_build)"
-      if [ -n "$b" ] && [ "$b" -lt "$MIN_LLAMA_BUILD" ]; then
-        die "llama.cpp build $b is too old for Muse Glimmer (needs $MIN_LLAMA_BUILD+)." "brew upgrade llama.cpp"
-      fi
-      ok "llama.cpp build ${b:-unknown} (needs $MIN_LLAMA_BUILD or newer)"
+      LLAMA_BUILD=""
+      check_llama_build
+      ok "llama.cpp build ${LLAMA_BUILD:-unknown} (needs $MIN_LLAMA_BUILD or newer)"
     fi
     have uv && ok "uv $(uv --version 2>/dev/null | awk '{print $2}')"
     have ffmpeg && ok "ffmpeg"

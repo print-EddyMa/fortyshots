@@ -53,6 +53,7 @@ def test_every_arm_and_mode_completes(tmp_path, arm, kw):
         assert summary["spent"] == 0 and len(summary["picks"]) == 40 and summary["leak"]["n_scored"] == 120
         return
     assert summary["spent"] == 40 and len(set(summary["picks"])) == 40 and not summary["aborted"]
+    assert summary["harness_picks"] == len(summary["harness_pick_ids"])
     assert len(summary["hit_flags"]) == len(summary["p_hits"]) == 40
     assert {"proposal", "human", "dft_order", "dft_result", "report", "claimcheck"} <= kinds
     assert all(e["payload"]["action"] == "auto" for e in evs if e["kind"] == "human")
@@ -139,10 +140,13 @@ def test_time_cap_autofills_remaining_lookups(tmp_path, arm, monkeypatch):
     assert order["rationale"].startswith("autofill")
     filled = summary["picks"][-summary["autofill"]:]
     assert all(p is None for p in summary["p_hits"][-summary["autofill"]:])
-    if arm == "A6":
-        bought_before = set(summary["picks"][: 40 - summary["autofill"]])
-        expected = [i for i in camp.env.mace_ranking() if i not in bought_before][: summary["autofill"]]
-        assert filled == expected
+    # autofill buys by S_mace for every arm (never A3's surrogate), and counts as harness picks
+    bought_before = set(summary["picks"][: 40 - summary["autofill"]])
+    expected = [i for i in camp.env.mace_ranking() if i not in bought_before][: summary["autofill"]]
+    assert filled == expected
+    assert "fit_surrogate" not in [e["payload"]["name"] for e in evs if e["kind"] == "tool_call" and e["round"] == 5]
+    assert summary["harness_pick_ids"][-summary["autofill"]:] == filled
+    assert summary["harness_picks"] == len(summary["harness_pick_ids"]) >= summary["autofill"]
     report = next(e for e in evs if e["kind"] == "report")
     assert report["payload"]["source"] == "template"
 
@@ -172,6 +176,9 @@ def test_invalid_proposer_output_falls_back_to_director_ranking(tmp_path):
     evs = events(camp.run_dir)
     assert any(e["kind"] == "error" and e["payload"]["where"] == "proposer.fallback" for e in evs)
     assert summary["spent"] == 40 and summary["p_hits"][0] is None and summary["brier"] is None
+    # every pick came from the harness's fallback ranking, and the summary says so (autofill is end-of-run only)
+    assert summary["autofill"] == 0
+    assert summary["harness_picks"] == 40 and summary["harness_pick_ids"] == summary["picks"]
 
 
 def test_live_mode_waits_for_the_human_gate(tmp_path):
@@ -206,6 +213,8 @@ def test_live_mode_waits_for_the_human_gate(tmp_path):
     humans = [e["payload"] for e in events(run_dir) if e["kind"] == "human"]
     assert [h["action"] for h in humans] == ["approve", "reject", "approve", "approve"]
     assert summary["spent"] == 40 and not set(rejected["ids"]) & set(summary["picks"][10:20])
+    # the two replacements for the rejected picks were chosen by the harness
+    assert summary["harness_picks"] == 2 and set(summary["harness_pick_ids"]) <= set(summary["picks"][10:20])
     assert not (run_dir / "pending.json").exists()
 
 

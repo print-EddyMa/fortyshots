@@ -69,10 +69,10 @@ def _obj(props: dict, required: list[str] | None = None) -> dict:
     return {"type": "object", "properties": props, "required": required or list(props), "additionalProperties": False}
 
 
-def batch_schema(n: int, ids: list[str], call_ids: list[str]) -> dict:
+def batch_schema(n: int, ids: list[str], call_ids: list[str], rationale_chars: int = 240) -> dict:
     pick = _obj({"id": {"type": "string", "enum": ids},
                  "p_hit": {"type": "number", "minimum": 0, "maximum": 1},
-                 "rationale": {"type": "string", "maxLength": 240},
+                 "rationale": {"type": "string", "maxLength": rationale_chars},
                  "evidence": _strs(call_ids or None, 4)})
     return _obj({"picks": {"type": "array", "items": pick, "minItems": n, "maxItems": n}})
 

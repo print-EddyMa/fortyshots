@@ -3,6 +3,11 @@
 Resume works by re-running the campaign from the start: model calls come back from the cassette, tools are
 deterministic, and the ledger matches re-emitted events against the events it already holds instead of writing them
 again. Once the ledger is caught up, the run continues live.
+
+Model-server failures (timeout, unreachable, HTTP error) are logged as `error` events carrying the call id and retried
+with backoff and a /health check. A resumed run replays those events as failed attempts of the same call, so a call
+that failed before a crash is simply sent again. After `llm_attempts` consecutive failures of one call, or at the time
+cap, the campaign stops, autofills the rest of the budget and still writes its summary (`aborted: true`).
 """
 import json
 import re
@@ -18,7 +23,7 @@ from .cassette import Cassette
 from .config import BATCH, BUDGET, DEFAULT_BASE_URL, DEFAULT_MAX_MINUTES, GOAL, MAX_DIRECTOR_CALLS, ROUNDS
 from .data import load_id_map
 from .ledger import Ledger
-from .llm import LLMClient, LLMError, LLMResult, image_part
+from .llm import ContextOverflow, LLMClient, LLMError, LLMResult, doctor_speeds, image_part
 from .roles import prompts as P
 from .roles.schemas import (
     Batch,
@@ -35,6 +40,7 @@ from .roles.schemas import (
 )
 from .tools import ARM_TOOLS, PoolEnv, ToolOutput, score_probe, tool_schemas
 
+STRENGTHS = ("low", "medium", "high", "xhigh")
 ROLE_STRENGTH = {"director": "medium", "proposer": "medium", "critic": "medium", "reporter": "low", "chemist": "medium",
                  "probe": "low"}
 MAX_TOKENS = {"director": 2048, "proposer": 3072, "critic": 2048, "reporter": 2048, "chemist": 2048, "probe": 3072}
@@ -42,10 +48,26 @@ MAX_DIRECTOR_TURNS = 8
 MAX_DIRECTOR_IMAGES = 2
 PROBE_CHUNK = 50
 RESULT_LEDGER_CHARS = 20000
+A4_RATIONALE_CHARS = 140  # about 20 words: keeps the 40-pick A4 batch near 2.5K output tokens
+MAX_BACKOFF_S = 120.0
+REFCODE_LIKE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{6}(?:\d{2})?(?![A-Za-z0-9])")
 
 
-class TimeUp(Exception):
+class CampaignStop(Exception):
+    """Stops the campaign early. The harness autofills the rest of the budget and the run counts (PREREG section 4)."""
+
+
+class TimeUp(CampaignStop):
     pass
+
+
+class ModelDown(CampaignStop):
+    """One model call failed `llm_attempts` times in a row."""
+
+
+def lower_strength(strength: str) -> str:
+    k = STRENGTHS.index(strength) if strength in STRENGTHS else 1
+    return STRENGTHS[max(0, k - 1)]
 
 
 @dataclass
@@ -71,6 +93,9 @@ class RunConfig:
     strengths: dict = field(default_factory=lambda: dict(ROLE_STRENGTH))
     doctor_report: Path | None = Path("doctor/report.json")
     approval_poll_s: float = 1.0
+    llm_attempts: int = 3            # consecutive failures of one model call before the campaign aborts
+    llm_backoff_s: float = 10.0      # first backoff after a failed call; doubles per attempt (capped at 120 s)
+    llm_health_wait_s: float = 300.0  # how long to wait for /health to answer before the next attempt
 
 
 def run_prefix(cfg: RunConfig) -> str:
@@ -91,15 +116,41 @@ def find_runs(cfg: RunConfig) -> tuple[list[Path], list[Path]]:
     return finished, unfinished
 
 
+class RefcodeMap:
+    """Refcode <-> id rewriting for the leak probe L, whose prompts carry raw CSD refcodes.
+
+    scrub() runs on everything the model wrote before it reaches the disk: refcodes match in any case and with up to
+    two trailing digits (CSD suffixes like ABAVIJ01; an exact entry wins, otherwise the base refcode is used), and
+    any other refcode-like token (six capitals, optionally two digits) becomes "[refcode]"."""
+
+    def __init__(self, data_dir: Path):
+        m = load_id_map(data_dir)
+        self.ref2id = dict(zip(m["refcode"].astype(str), m["id"].astype(str)))
+        self.id2ref = {v: k for k, v in self.ref2id.items()}
+        self.fold: dict[str, str] = {}
+        for ref, i in self.ref2id.items():
+            self.fold.setdefault(ref.casefold(), i)
+        alts = "|".join(map(re.escape, sorted(self.ref2id, key=len, reverse=True)))
+        self.to_id = re.compile(r"(?<![A-Za-z0-9])(" + alts + r")(\d{2})?(?![A-Za-z0-9])", re.IGNORECASE)
+        self.to_ref = re.compile(r"\b(m[0-9a-f]{7})\b")
+
+    def resolve(self, token: str) -> str | None:
+        """The id a refcode as the model wrote it stands for (case-insensitive, CSD suffix allowed), else None."""
+        m = self.to_id.fullmatch(token.strip())
+        return self.fold.get(m.group(1).casefold()) if m else None
+
+    def scrub(self, text: str) -> str:
+        text = self.to_id.sub(lambda x: self.fold[x.group(1).casefold()], text)
+        return REFCODE_LIKE.sub("[refcode]", text)
+
+    def unscrub(self, text: str) -> str:
+        return self.to_ref.sub(lambda x: self.id2ref.get(x.group(1), x.group(1)), text)
+
+
 def refcode_scrubbers(data_dir: Path):
     """(refcode -> id, id -> refcode) text rewriters for the leak probe."""
-    m = load_id_map(data_dir)
-    ref2id = dict(zip(m["refcode"].astype(str), m["id"].astype(str)))
-    id2ref = {v: k for k, v in ref2id.items()}
-    to_id = re.compile(r"\b(" + "|".join(map(re.escape, sorted(ref2id, key=len, reverse=True))) + r")\b")
-    to_ref = re.compile(r"\b(m[0-9a-f]{7})\b")
-    return (lambda t: to_id.sub(lambda x: ref2id[x.group(1)], t),
-            lambda t: to_ref.sub(lambda x: id2ref.get(x.group(1), x.group(1)), t))
+    m = RefcodeMap(data_dir)
+    return m.scrub, m.unscrub
 
 
 def _strip_fences(text: str) -> str:
@@ -109,16 +160,20 @@ def _strip_fences(text: str) -> str:
     return t
 
 
-def trim_messages(messages: list[dict]) -> list[dict]:
-    """Shrinks a thread after an empty, length-cut answer: older tool results keep only their first line."""
+def trim_messages(messages: list[dict], drop_images: bool = False) -> list[dict]:
+    """Shrinks a thread after an empty, length-cut answer or a context overflow: older tool results keep only their
+    first line and only the last message keeps its images (none at all with drop_images)."""
     out, last = [], len(messages) - 1
     for k, m in enumerate(messages):
         m = dict(m)
         old = k < last - 1
         if m["role"] == "tool" and old:
             m["content"] = m["content"].split("\n", 1)[0] + " (details trimmed)"
-        elif m["role"] == "user" and isinstance(m.get("content"), list) and k < last:
-            m["content"] = " ".join(p.get("text", "") for p in m["content"] if p.get("type") == "text")
+        elif m["role"] == "user" and isinstance(m.get("content"), list) and (k < last or drop_images):
+            parts = m["content"]
+            m["content"] = " ".join(p.get("text", "") for p in parts if p.get("type") == "text")
+            if k == last and any(p.get("type") == "image_url" for p in parts):
+                m["content"] += " (images omitted: the context was full)"
         elif m["role"] == "user" and old and isinstance(m.get("content"), str) and m["content"].startswith("Tool res"):
             m["content"] = "\n".join(line for line in m["content"].splitlines() if line.startswith("[c"))
         out.append(m)
@@ -132,12 +187,14 @@ class Campaign:
         self.run_dir = Path(cfg.runs_dir) / self.run_id
         self.ledger = Ledger(self.run_dir, self.run_id)
         self.resumed = bool(self.ledger.prior)
-        self.scrub = self.unscrub = None
+        self.scrub = self.unscrub = self.refmap = None
         if cfg.arm == "L":  # refcodes reach the model here, and never the disk
-            self.scrub, self.unscrub = refcode_scrubbers(cfg.data_dir)
+            self.refmap = RefcodeMap(cfg.data_dir)
+            self.scrub, self.unscrub = self.refmap.scrub, self.refmap.unscrub
         cas_path = cfg.cassette_from if cfg.cassette == "replay" and cfg.cassette_from else self.run_dir / "cassette.jsonl"
         cassette = Cassette(cas_path, cfg.cassette, encode=self.scrub, decode=self.unscrub)
-        self.client = client or LLMClient(cfg.base_url, cassette=cassette, transport=transport)
+        self.client = client or LLMClient(cfg.base_url, cassette=cassette, transport=transport,
+                                          **doctor_speeds(cfg.doctor_report))
         tools = ARM_TOOLS.get(cfg.arm, [])
         self.env = PoolEnv(cfg.data_dir, cfg.pool, self.run_dir / "img", cfg.budget, tools)
         self.round = 0
@@ -151,6 +208,8 @@ class Campaign:
         self.history: list[dict] = []
         self.p_hit: dict[str, float | None] = {}
         self.autofill = 0
+        self.round_harness: set[str] = set()  # ids the harness (not the model) chose this round
+        self.harness_ids: list[str] = []      # every bought id the harness chose, in purchase order
         self.aborted = False
         self.model_name = None
         self.t0 = time.monotonic()
@@ -168,9 +227,9 @@ class Campaign:
     def emit(self, kind: str, role: str, payload: dict, **kw) -> dict:
         return self.ledger.emit(kind, role, payload, self.round, **kw)
 
-    def error(self, where: str, message: str, recovered: bool, call_id: str | None = None):
-        self.emit("error", "system", {"where": where, "message": message[:500], "recovered": recovered},
-                  call_id=call_id)
+    def error(self, where: str, message: str, recovered: bool, call_id: str | None = None, **extra) -> dict:
+        return self.emit("error", "system", {"where": where, "message": self._scrub(message)[:500],
+                                             "recovered": recovered, **extra}, call_id=call_id)
 
     def elapsed(self) -> float:
         return self.elapsed_offset + time.monotonic() - self.t0
@@ -210,30 +269,76 @@ class Campaign:
     def llm_call(self, role: str, messages: list[dict], *, schema: tuple[str, dict] | None = None,
                  tools: list[dict] | None = None, tool_choice: str | None = None,
                  log_role: str | None = None, max_tokens: int | None = None) -> tuple[LLMResult, str]:
+        """One model call. An empty length-cut answer or a context overflow is retried once with a trimmed thread
+        (older tool results cut to one line, images dropped); a length cut also lowers reasoning_strength a level."""
         if self.time_up():
             raise TimeUp
         strength = self.cfg.strengths.get(role, "medium")
         cid = self.next_cid()
         limit = max_tokens or MAX_TOKENS.get(role, 2048)
-        res = self._send(role, log_role or role, messages, cid, schema, tools, tool_choice, strength, limit)
-        if res.truncated:
-            cid2 = self.next_cid()
-            res = self._send(role, log_role or role, trim_messages(messages), cid2, schema, tools, tool_choice,
-                             strength, limit)
-            self.error(f"{role}.llm", "empty content with finish_reason=length; retried once with trimmed context",
-                       recovered=not res.truncated, call_id=cid)
-            cid = cid2
-        return res, cid
+        lr = log_role or role
+        try:
+            res = self._send(role, lr, messages, cid, schema, tools, tool_choice, strength, limit, may_retry=True)
+            if not res.truncated:
+                return res, cid
+            cause = "length"
+        except ContextOverflow:
+            cause = "context"
+        strength2 = lower_strength(strength) if cause == "length" else strength
+        cid2 = self.next_cid()
+        try:
+            res = self._send(role, lr, trim_messages(messages, drop_images=True), cid2, schema, tools, tool_choice,
+                             strength2, limit, may_retry=False)
+        except ContextOverflow:
+            return LLMResult("", "", [], "length", {}, {}, {}), cid2
+        if cause == "length":
+            lowered = f" and reasoning_strength {strength2}" if strength2 != strength else ""
+            self.error(f"{role}.llm", "empty content with finish_reason=length; retried once with trimmed context"
+                       + lowered, recovered=not res.truncated, call_id=cid, cause="length")
+        return res, cid2
 
-    def _send(self, role, log_role, messages, cid, schema, tools, tool_choice, strength, limit) -> LLMResult:
+    def _send(self, role, log_role, messages, cid, schema, tools, tool_choice, strength, limit,
+              may_retry: bool = True) -> LLMResult:
+        """Sends one request, retrying model-server failures. Raises ContextOverflow (after logging it), or
+        ModelDown after cfg.llm_attempts consecutive failures. Failures recorded in a prior ledger replay as failed
+        attempts, so a call that failed before a crash is sent again on resume."""
         req = self.client.build_request(messages, tools=tools, tool_choice=tool_choice, schema=schema,
                                         reasoning_strength=strength, max_tokens=limit,
                                         seed=self.cfg.seed * 100_000 + self._cid)
-        try:
-            res = self.client.send(req)
-        except LLMError as e:
-            self.error(f"{role}.llm", str(e), recovered=False, call_id=cid)
-            raise
+        n_attempts = max(1, self.cfg.llm_attempts)
+        failures = 0
+        while True:
+            prior = self.ledger.peek()
+            if prior and prior["kind"] == "error" and prior.get("call_id") == cid:
+                ev = self.ledger.emit("error", "system", prior["payload"], prior["round"], call_id=cid)
+                if ev["payload"].get("cause") == "context":
+                    raise ContextOverflow(ev["payload"].get("message", "context overflow"))
+                failures += 1
+            else:
+                try:
+                    res = self.client.send(req)
+                    break
+                except ContextOverflow as e:
+                    what = ("retrying once with trimmed context and no images" if may_retry else
+                            "still too large after trimming; treated as an empty answer")
+                    self.error(f"{role}.llm", f"context overflow ({e}); {what}", recovered=may_retry, call_id=cid,
+                               cause="context")
+                    raise
+                except LLMError as e:
+                    failures += 1
+                    last = failures >= n_attempts
+                    self.error(f"{role}.llm", f"{e} (attempt {failures} of {n_attempts}; "
+                                              f"{'giving up' if last else 'retrying'})",
+                               recovered=not last, call_id=cid, cause="transport", attempt=failures)
+            if failures >= n_attempts:
+                self.aborted = True
+                self.error("llm_unavailable", f"the model server failed {failures} times in a row; the campaign "
+                                              "stops and the remaining lookups are autofilled", recovered=True)
+                raise ModelDown
+            if self.time_up():
+                raise TimeUp
+            if not self.ledger.replaying:
+                self._wait_for_server(failures)
         n_images = sum(1 for m in messages if isinstance(m.get("content"), list)
                        for p in m["content"] if p.get("type") == "image_url")
         self.emit("llm_call", log_role, {"model": self.model_name, "reasoning_strength": strength,
@@ -246,6 +351,19 @@ class Campaign:
         if res.content.strip() and schema is None and role != "reporter":
             self.emit("message", log_role, {"text": self._scrub(res.content)}, call_id=cid)
         return res
+
+    def _wait_for_server(self, failures: int):
+        """Backoff after a failed call, then wait for /health to answer (bounded by llm_health_wait_s)."""
+        time.sleep(min(MAX_BACKOFF_S, self.cfg.llm_backoff_s * 2 ** (failures - 1)))
+        deadline = time.monotonic() + self.cfg.llm_health_wait_s
+        while True:
+            try:
+                ready = self.client.get("/health", timeout=5.0).status_code == 200
+            except Exception:  # noqa: BLE001 - any failure means "not ready yet"
+                ready = False
+            if ready or time.monotonic() >= deadline or self.elapsed() > self.cfg.max_minutes * 60:
+                return
+            time.sleep(min(5.0, max(0.0, deadline - time.monotonic())))
 
     def _scrub(self, text: str) -> str:
         return self.scrub(text) if self.scrub else text
@@ -298,7 +416,10 @@ class Campaign:
             "config": {"action_mode": self.cfg.action_mode, "vision": self.cfg.vision,
                        "shared_tools": self.cfg.shared_tools, "max_minutes": self.cfg.max_minutes,
                        "max_director_calls": self.cfg.max_calls, "strengths": self.cfg.strengths,
-                       "tools": self.env.tools, "cassette": self.client.cassette.mode}})
+                       "tools": self.env.tools, "cassette": self.client.cassette.mode,
+                       "llm": {"timeout_floor_s": self.client.timeout, "decode_tps": self.client.decode_tps,
+                               "prefill_tps": self.client.prefill_tps, "timeout_override_s": self.client.timeout_override,
+                               "attempts": self.cfg.llm_attempts}}})
 
     def run(self) -> dict:
         self.header()
@@ -312,7 +433,7 @@ class Campaign:
                 if self.time_up():
                     break
                 self.run_round(r, min(batch, self.env.remaining))
-        except TimeUp:
+        except CampaignStop:
             pass
         self.round = rounds + 1
         if self.env.remaining > 0:
@@ -325,6 +446,7 @@ class Campaign:
     def run_round(self, r: int, n: int):
         self.round_listing: list[str] = []
         self.round_calibration: ToolOutput | None = None
+        self.round_harness = set()
         thread = [self.system_msg(r)]
         called = self.director(thread, r)
         if r >= 2 and "calibrate_oracle" in self.env.tools and "calibrate_oracle" not in called:
@@ -332,7 +454,10 @@ class Campaign:
             self.emit("message", "system", {"text": note})
             cid, out = self.run_tool("system", "calibrate_oracle", {})
             thread.append({"role": "user", "content": f"[lab] {note}\n{out.for_llm(cid, 'calibrate_oracle')}"})
-        picks = self.propose(thread, r, n, P.PROPOSER.format(round=r, rounds=self.n_rounds, n=n), set())
+        instruction = P.PROPOSER.format(round=r, rounds=self.n_rounds, n=n)
+        if self.cfg.arm == "A4":
+            instruction += P.PROPOSER_SHORT
+        picks = self.propose(thread, r, n, instruction, set())
         self.emit("proposal", "proposer", {"picks": picks, "stage": "initial"})
         vetoed = []
         if self.cfg.arm != "A4":
@@ -353,6 +478,7 @@ class Campaign:
                      + (f"; critic vetoed {len(vetoed)}" if vetoed else ""))
         before = self.env.spent
         self.buy(ids, rationale, {i: p_by_id.get(i) for i in ids})
+        self.harness_ids += [i for i in self.env.order[before:] if i in self.round_harness]
         new_hits = sum(self.env.bought[i]["hit"] for i in self.env.order[before:])
         self.history.append({"round": r, "ids": ids, "p_hits": [p_by_id.get(i) for i in ids], "hits": new_hits,
                              "vetoed": vetoed})
@@ -464,7 +590,8 @@ class Campaign:
 
     def propose(self, thread: list[dict], r: int, n: int, instruction: str, exclude: set[str]) -> list[dict]:
         allowed = [i for i in self.env.unbought() if i not in exclude]
-        schema = ("Batch", batch_schema(n, allowed, self.tool_cids))
+        short = self.cfg.arm == "A4"
+        schema = ("Batch", batch_schema(n, allowed, self.tool_cids, A4_RATIONALE_CHARS if short else 240))
         tools, choice = self.role_tools("proposer")
         thread.append({"role": "user", "content": instruction})
         errors, picks, err = [], [], "no answer"
@@ -485,6 +612,7 @@ class Campaign:
             have = {p["id"] for p in picks}
             for i in self.fallback_ranking(exclude | have)[: n - len(picks)]:
                 picks.append({"id": i, "p_hit": None, "rationale": "fallback: Director's ranking", "evidence": []})
+                self.round_harness.add(i)
             self.error("proposer.fallback", f"filled {n - len(have)} pick(s) from the Director's ranking",
                        recovered=False)
         return picks
@@ -572,6 +700,7 @@ class Campaign:
         if decision["action"] == "reject":
             keep = [i for i in ids if i not in decision["ids"]]
             repl = self.fallback_ranking(set(ids))[: len(ids) - len(keep)]
+            self.round_harness.update(repl)
             return keep + repl
         return ids
 
@@ -603,19 +732,15 @@ class Campaign:
             "hits_total": out.result["hits_total"], "spent": out.result["spent"]}, call_id=cid)
 
     def fill_remaining(self):
+        """End-of-run autofill: the unbought MOFs with the lowest S_mace, for every arm (simple and arm-neutral)."""
         n = self.env.remaining
         self.round_listing = []
-        source = "S_mace"
-        ranking = []
-        if "fit_surrogate" in self.env.tools and len(self.env.bought) >= 5:
-            _, out = self.run_tool("system", "fit_surrogate", {"kappa": 1.0, "top_k": min(n, 25)})
-            if out.ok:
-                ranking, source = list(out.ids), "fit_surrogate"
-        ranking += [i for i in self.env.mace_ranking() if i not in ranking]
-        ids = [i for i in ranking if i not in self.env.bought][:n]
-        why = "time cap reached" if self.aborted else "budget left after the last round"
+        ids = [i for i in self.env.mace_ranking() if i not in self.env.bought][:n]
+        why = "the campaign stopped early" if self.aborted else "budget left after the last round"
         self.autofill = len(ids)
-        self.buy(ids, f"autofill: {why}; {len(ids)} lookups filled from the {source} ranking", {})
+        before = self.env.spent
+        self.buy(ids, f"autofill: {why}; {len(ids)} lookups filled from the S_mace ranking", {})
+        self.harness_ids += [i for i in self.env.order[before:] if i in set(ids)]
 
     # ---- report ----------------------------------------------------------------------
     def evidence_digest(self) -> str:
@@ -658,7 +783,7 @@ class Campaign:
                     self.error("reporter", "empty report; using the template report", recovered=False)
                 else:
                     source = "model"
-            except TimeUp:
+            except CampaignStop:
                 text = None
         text = text or self.template_report()
         self.emit("report", "reporter" if source == "model" else "system",
@@ -679,8 +804,8 @@ class Campaign:
         try:
             res, cid = self.llm_call("chemist", msgs, schema=("Mutations", mutations_schema(parents)))
             muts = Mutations.model_validate_json(_strip_fences(res.content)).mutations
-        except (ValidationError, TimeUp) as e:
-            self.error("chemist", str(e).splitlines()[0][:300], recovered=False)
+        except (ValidationError, CampaignStop) as e:
+            self.error("chemist", (str(e).splitlines() or [type(e).__name__])[0][:300], recovered=False)
             return
         for m in muts:
             spec = m.model_dump(exclude={"parent", "rationale"})
@@ -699,7 +824,8 @@ class Campaign:
             "lookups_to_first_hit": next((k + 1 for k, h in enumerate(flags) if h), None),
             "brier": round(sum((p - h) ** 2 for p, h in scored) / len(scored), 4) if scored else None,
             "p_hits": p_hits, "duration_s": round(self.elapsed(), 1), "aborted": self.aborted,
-            "autofill": self.autofill, **(extra or {})}
+            "autofill": self.autofill, "harness_picks": len(self.harness_ids), "harness_pick_ids": list(self.harness_ids),
+            **(extra or {})}
         self.emit("summary", "system", summary)
         self.ledger.write_summary(summary)
         return summary
@@ -737,22 +863,26 @@ class Campaign:
                 keys = [key_of[i] for i in chunk]
                 msgs = [{"role": "system", "content": P.PROBE_SYSTEM},
                         {"role": "user", "content": template.format(n=len(chunk), items="\n".join(map(line, chunk)))}]
-                got = {}
+                got: dict[str, float] = {}
                 for attempt in range(2):
                     res, _ = self.llm_call("probe", msgs, schema=("Scores", scores_schema(keys)), log_role="proposer")
                     try:
-                        got = {s.key: s.score for s in Scores.model_validate_json(_strip_fences(res.content)).scores
-                               if s.key in id_of}
-                        break
+                        parsed = Scores.model_validate_json(_strip_fences(res.content)).scores
                     except ValidationError as e:
                         self.error("probe.scores", f"invalid scores JSON: {e.error_count()} error(s)",
                                    recovered=attempt == 0)
-                missing = [kk for kk in keys if kk not in got]
+                        continue
+                    for sc in parsed:
+                        i = id_of.get(sc.key) or (self.refmap.resolve(sc.key) if self.refmap else None)
+                        if i in chunk:
+                            got[i] = sc.score
+                    break
+                missing = [i for i in chunk if i not in got]
                 if missing:
                     self.error("probe.scores", f"{len(missing)} item(s) unscored; scored 0", recovered=False)
-                for kk in keys:
-                    scores[id_of[kk]] = float(got.get(kk, 0))
-        except TimeUp:
+                for i in chunk:
+                    scores[i] = float(got.get(i, 0))
+        except CampaignStop:
             pass
         tiebreak = {i: float(rng.random()) for i in sorted(scores)}
         ranked = sorted(scores, key=lambda i: (-scores[i], tiebreak[i]))
@@ -767,7 +897,7 @@ class Campaign:
             "mode": self.cfg.mode, "model": self.model_name, "hits": sum(flags), "spent": 0, "picks": top,
             "hit_flags": flags, "lookups_to_first_hit": next((k + 1 for k, h in enumerate(flags) if h), None),
             "brier": None, "p_hits": [scores[i] / 10 for i in top], "duration_s": round(self.elapsed(), 1),
-            "aborted": self.aborted, "autofill": 0, "ranking": ranked, "scores": {i: scores[i] for i in ranked},
+            "aborted": self.aborted, "autofill": 0, "harness_picks": 0, "harness_pick_ids": [], "ranking": ranked, "scores": {i: scores[i] for i in ranked},
             "leak": {"auc": leak["auc"], "n": leak["n"], "n_hits": leak["n_hits"], "n_scored": len(scores)}}
         self.emit("summary", "system", summary)
         self.ledger.write_summary(summary)

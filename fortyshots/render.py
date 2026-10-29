@@ -9,11 +9,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-SYMBOLS = {1: "H", 3: "Li", 5: "B", 6: "C", 7: "N", 8: "O", 9: "F", 11: "Na", 12: "Mg", 13: "Al", 14: "Si", 15: "P",
-           16: "S", 17: "Cl", 19: "K", 20: "Ca", 21: "Sc", 22: "Ti", 23: "V", 24: "Cr", 25: "Mn", 26: "Fe", 27: "Co",
-           28: "Ni", 29: "Cu", 30: "Zn", 31: "Ga", 34: "Se", 35: "Br", 37: "Rb", 38: "Sr", 39: "Y", 40: "Zr", 41: "Nb",
-           42: "Mo", 44: "Ru", 45: "Rh", 46: "Pd", 47: "Ag", 48: "Cd", 49: "In", 50: "Sn", 53: "I", 55: "Cs", 56: "Ba",
-           57: "La", 58: "Ce", 63: "Eu", 64: "Gd", 65: "Tb", 66: "Dy", 72: "Hf", 78: "Pt", 79: "Au", 82: "Pb", 83: "Bi"}
+# Element symbols by atomic number, Z = 1..103 (hard-coded: the light venv has no ase).
+ELEMENTS = (
+    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
+    "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y",
+    "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce",
+    "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir",
+    "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm",
+    "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr"
+)
+SYMBOLS = {z: sym for z, sym in enumerate(ELEMENTS, start=1)}
 COLORS = {"H": "#f2f2f2", "C": "#5a5a5a", "N": "#3b5bdb", "O": "#e03131", "F": "#69db7c", "Cl": "#2f9e44",
           "Br": "#a61e4d", "I": "#862e9c", "S": "#f2c94c", "P": "#f08c00", "B": "#ffa8a8", "Si": "#c0a080"}
 METAL_COLOR = "#1c7ed6"
