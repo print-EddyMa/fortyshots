@@ -120,3 +120,24 @@ IDs look like `m` plus 7 hex characters, for example `m3fa9c2e`. They are salted
 - **Routing and base.** Hash routing (`#/console/<run_id>`), and Vite `base: './'`.
 - **What the build copies.** `runs/` (all files except `cassette.jsonl`), `results/`, and `data/structures/`, into `docs/data/...`.
 - **Live mode.** `?live=1` reads `/api/...` from the live server instead of static files.
+
+## Addenda (Oct 29, from the agent-core build)
+
+- **`request_dft`.** The result also carries `S`, `hits_new`, `hits_total`, `spent`, `remaining` and `already_bought_not_charged`. Table-shaped tool results are `{columns, rows}`.
+- **`render_structure`.** Uses only the framework atoms from `structures/<id>.json` plus `co2_best_ads_pos` from the MACE cache. The stored best-DFT CO2 placement is never shown to the agent.
+- **Extra payload keys.**
+  - `llm_call.n_tool_calls`
+  - `proposal.stage` (`initial`, `revised` or `probe`) and `proposal.replaced`
+  - `critique.vision`
+  - `report.source` (`model` or `template`) and `report.written_by`
+  - `header.config`
+  - `summary.run_id`, `summary.mode`, `summary.model`
+  - For L and L2: `summary.ranking` and `summary.leak: {auc, n, n_hits, n_scored}`
+- **Reporting phase.** Autofill, the report and the claim check are logged at round `rounds + 1`.
+- **Live mode.** The live server uses two files, `runs/<id>/pending.json` and `runs/<id>/human.jsonl`.
+  - `POST /api/runs/<id>/human` takes `{action, ids, note, round?}`.
+  - Extra GET endpoints: `/api/runs/<id>/pending`, `/api/runs/<id>/summary`, `/api/runs/<id>/img/<name>` and `/api/network`.
+  - The static mount is `/data/runs`.
+- **Extra `run` flags.** `--resume`, `--run-id`, `--rounds N` (the budget becomes 10·N), `--no-vision`, `--shared-tools`, `--cassette off|record|replay`, `--cassette-from`, `--chemist`, `--data-dir` and `--doctor-report`.
+- **Plan files.** Either `{defaults?, runs: [{arm, pool, seed, ...}]}` or a bare list.
+- **Leak AUC.** Compute it from `summary.leak` or `summary.ranking`, not from `picks`.

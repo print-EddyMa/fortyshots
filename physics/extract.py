@@ -14,10 +14,9 @@ import sys
 import warnings
 
 warnings.filterwarnings("ignore")
-import lmdb  # noqa: E402
-import numpy as np  # noqa: E402
-from ase import Atoms  # noqa: E402
-from ase.io import write  # noqa: E402
+import lmdb
+from ase import Atoms
+from ase.io import write
 
 ALLOW = ("torch", "torch_geometric", "numpy", "collections", "builtins", "copyreg", "_codecs")
 BAD = {"eval", "exec", "system", "__import__", "getattr", "open", "compile", "input", "breakpoint"}

@@ -48,8 +48,8 @@ def main():
     rows, best = [], {}
     for a in iread(src, index=":"):
         i = a.info
-        rows.append(dict(name=i["name"], mof=i["mof"], gas=i["gas"], split=i["split"], natoms=len(a),
-                         y_init=i["y_init"], y_relaxed=i["y_relaxed"], oms=bool(i.get("oms", False))))
+        rows.append({"name": i["name"], "mof": i["mof"], "gas": i["gas"], "split": i["split"], "natoms": len(a),
+                     "y_init": i["y_init"], "y_relaxed": i["y_relaxed"], "oms": bool(i.get("oms", False))})
         if i["gas"] == "CO2":
             k = (i["split"], i["mof"])
             if k not in best or i["y_relaxed"] < best[k][0]:
