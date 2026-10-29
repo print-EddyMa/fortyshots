@@ -1,0 +1,66 @@
+{
+  "name": "main",
+  "description": "Oct 31 night. A5 (full agent) on P1-P5 seed 0, then A4 (zero-shot) on P1-P5 seed 0, then the leak probes L and L2.",
+  "runs": [
+    {
+      "arm": "A5",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P2",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P3",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P4",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P5",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P2",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P3",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P4",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P5",
+      "seed": 0
+    },
+    {
+      "arm": "L",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "L2",
+      "pool": "P1",
+      "seed": 0
+    }
+  ]
+}

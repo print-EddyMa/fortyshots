@@ -1,0 +1,1310 @@
+#!/usr/bin/env bash
+# fortyshots lab: the one command for the Mac side of fortyshots.
+#
+#   ./lab help        list every command
+#
+# Written for the bash 3.2 that ships with macOS (no associative arrays, no ${x,,}, no mapfile)
+# and for BSD userland (no GNU-only flags). LAB_MOCK=1 swaps llama-server for `fortyshots mock-llm`
+# and skips the macOS-only checks, so every command can be tested on Linux.
+#
+# Environment overrides (all optional):
+#   GLIMMER_DIR   where model files, server.log and lab state live   (default ~/glimmer)
+#   LAB_MOCK=1    use the fake model server; skip macOS checks
+#   LAB_VENV      Python environment that has the fortyshots package (default ./.venv)
+#   LAB_YES=1     answer yes to every confirmation
+#   LAB_PORT      llama-server port (default 8080); LAB_SERVE_PORT console port (default 7777)
+#   LAB_NO_UPDATE=1  record/pilot do not update the code from GitHub first
+#   LAB_KEEP_MODEL=1 record leaves the model running at the end
+#   (tests only: LAB_SWAP_CMD prints a fake swap value in MB, LAB_ENFORCE_SWAP=1 applies swap rules in mock
+#    mode, LAB_MAX_FILE_BYTES lowers the 95 MB media limit)
+
+set -o pipefail
+
+LAB_VERSION=1
+ORIG_PWD="$PWD"
+REPO="$(cd "$(dirname "$0")" && pwd -P)"
+GLIMMER_DIR="${GLIMMER_DIR:-$HOME/glimmer}"
+STATE="$GLIMMER_DIR/.lab"
+SERVER_LOG="$GLIMMER_DIR/server.log"
+SERVE_LOG="$GLIMMER_DIR/serve.log"
+VENV="${LAB_VENV:-$REPO/.venv}"
+FS="$VENV/bin/fortyshots"
+PROFILES="$REPO/mac/profiles.json"
+PLANS_DIR="$REPO/mac/plans"
+PORT="${LAB_PORT:-8080}"
+SERVE_PORT="${LAB_SERVE_PORT:-7777}"
+BASE_URL="http://127.0.0.1:$PORT"
+MOCK="${LAB_MOCK:-0}"
+OS="$(uname -s)"
+SWAP_LIMIT_MB=1024        # doctor switches profile above this swap growth
+REHEARSE_SWAP_MB=512      # rehearsal warns above this
+MIN_LLAMA_BUILD=10353     # first llama.cpp release with Muse Glimmer
+MAX_FILE_BYTES="${LAB_MAX_FILE_BYTES:-99614720}"   # 95 MB: GitHub rejects files over 100 MB (override only for tests)
+PY=""
+CHILD=""
+INTERRUPTED=0
+RUN_RC=0
+
+# ---------------------------------------------------------------- output
+
+set_colors() {
+  if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
+    C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'; C_R=$'\033[31m'; C_D=$'\033[2m'; C_0=$'\033[0m'
+  else
+    C_B=""; C_G=""; C_Y=""; C_R=""; C_D=""; C_0=""
+  fi
+}
+set_colors
+
+step() { printf '\n%s==> %s%s\n' "$C_B" "$*" "$C_0"; }
+ok()   { printf '  %sok%s    %s\n' "$C_G" "$C_0" "$*"; }
+info() { printf '        %s\n' "$*"; }
+dim()  { printf '        %s%s%s\n' "$C_D" "$*" "$C_0"; }
+warn() { printf '  %swarn%s  %s\n' "$C_Y" "$C_0" "$*"; }
+# die "what went wrong" "exact next command"
+die() {
+  printf '\n  %sFAIL%s  %s\n' "$C_R" "$C_0" "$1" >&2
+  if [ -n "${2:-}" ]; then printf '  Next: %s%s%s\n' "$C_B" "$2" "$C_0" >&2; fi
+  exit 1
+}
+
+confirm() {  # confirm "question"  -> 0 for yes
+  if [ "${LAB_YES:-0}" = 1 ]; then return 0; fi
+  if [ ! -t 0 ]; then return 1; fi
+  local ans
+  printf '  %s?%s     %s [Y/n] ' "$C_B" "$C_0" "$1"
+  read -r ans
+  case "$ans" in n|N|no|NO|No) return 1 ;; *) return 0 ;; esac
+}
+
+stamp() { date +%Y%m%d-%H%M%S; }
+now() { date +%s; }
+is_mac() { [ "$OS" = "Darwin" ]; }
+mock() { [ "$MOCK" = 1 ]; }
+enforce_swap() { ! mock || [ "${LAB_ENFORCE_SWAP:-0}" = 1 ]; }   # mock runs ignore swap unless a test asks
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# ---------------------------------------------------------------- small helpers
+
+need_py() {
+  [ -n "$PY" ] && return 0
+  if [ -x "$VENV/bin/python" ]; then PY="$VENV/bin/python"; return 0; fi
+  if is_mac && ! xcode-select -p >/dev/null 2>&1; then
+    die "Apple's command line tools are missing (they provide python3 and git)." "xcode-select --install"
+  fi
+  if have python3; then PY="$(command -v python3)"; return 0; fi
+  die "python3 not found." "xcode-select --install"
+}
+
+H() { need_py; "$PY" "$REPO/mac/labhelp.py" "$@"; }
+
+need_fs() {
+  [ -x "$FS" ] || die "The fortyshots Python package is not installed in $VENV yet." "./lab setup"
+}
+
+need_cmd() {  # need_cmd tool "brew package"
+  have "$1" || die "$1 is not installed." "brew install ${2:-$1}"
+}
+
+file_size() {
+  if [ ! -f "$1" ]; then echo 0; return; fi
+  if is_mac; then stat -f %z "$1"; else stat -c %s "$1"; fi
+}
+file_mtime() { if is_mac; then stat -f %m "$1"; else stat -c %Y "$1"; fi; }
+sha256_of() {
+  if have shasum; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi
+}
+gb() { awk -v b="$1" 'BEGIN { printf "%.1f", b / 1000000000 }'; }
+mb_to_gb() { awk -v m="$1" 'BEGIN { printf "%.2f", m / 1024 }'; }
+
+swap_used_mb() {
+  if [ -n "${LAB_SWAP_CMD:-}" ]; then sh -c "$LAB_SWAP_CMD"; return; fi   # test hook
+  if is_mac; then
+    sysctl -n vm.swapusage 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "used") { v = $(i + 2);
+      u = substr(v, length(v)); n = substr(v, 1, length(v) - 1) + 0;
+      if (u == "G") n = n * 1024; if (u == "K") n = n / 1024; printf "%d\n", n; exit } }'
+  elif [ -r /proc/meminfo ]; then
+    awk '/^SwapTotal:/ {t = $2} /^SwapFree:/ {f = $2} END {printf "%d\n", (t - f) / 1024}' /proc/meminfo
+  else
+    echo 0
+  fi
+}
+
+mem_free_pct() {
+  if is_mac; then
+    memory_pressure 2>/dev/null | awk -F': ' '/free percentage/ {gsub("%", "", $2); print $2 + 0; exit}'
+  elif [ -r /proc/meminfo ]; then
+    awk '/^MemTotal:/ {t = $2} /^MemAvailable:/ {a = $2} END {if (t) printf "%d\n", 100 * a / t}' /proc/meminfo
+  fi
+}
+
+wired_limit_mb() { if is_mac; then sysctl -n iogpu.wired_limit_mb 2>/dev/null; fi; }
+
+machine_chip() {
+  if is_mac; then sysctl -n machdep.cpu.brand_string 2>/dev/null
+  else awk -F': ' '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null; fi
+}
+machine_ram_gb() {
+  if is_mac; then awk -v b="$(sysctl -n hw.memsize 2>/dev/null)" 'BEGIN {printf "%d", b / 1073741824}'
+  else awk '/^MemTotal:/ {printf "%d", $2 / 1048576}' /proc/meminfo 2>/dev/null; fi
+}
+machine_os() { if is_mac; then echo "macOS $(sw_vers -productVersion 2>/dev/null)"; else uname -sr; fi; }
+
+llama_build() {
+  llama-server --version 2>&1 | sed -n 's/.*version: *\([0-9][0-9]*\).*/\1/p' | head -n 1
+}
+
+# "on" / "off" / "unknown". Honest network state for run logs; only "off" may be described as Wi-Fi off.
+net_state() {
+  if is_mac; then
+    route -n get default >/dev/null 2>&1 || { echo off; return; }
+  elif have ip; then
+    [ -n "$(ip route show default 2>/dev/null)" ] || { echo off; return; }
+  fi
+  if curl -s -o /dev/null --max-time 3 https://1.1.1.1 2>/dev/null; then echo on; else echo unknown; fi
+}
+
+origin_url() { git remote get-url origin 2>/dev/null; }
+
+# Can we talk to the git remote? A local path remote (tests) counts as reachable.
+remote_reachable() {
+  local url; url="$(origin_url)"
+  [ -n "$url" ] || return 1
+  case "$url" in
+    /*|file://*) return 0 ;;
+    *) curl -s -o /dev/null --max-time 8 https://github.com 2>/dev/null ;;
+  esac
+}
+
+health() {  # prints the HTTP code of the model server's /health (000 = nothing listening)
+  curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 3 "$BASE_URL/health" 2>/dev/null || true
+}
+
+pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+
+stop_pidfile() {  # stop_pidfile file "name"
+  local f="$1" name="$2" p i=0
+  [ -f "$f" ] || return 1
+  p="$(cat "$f")"
+  if kill -0 "$p" 2>/dev/null; then
+    kill "$p" 2>/dev/null
+    while kill -0 "$p" 2>/dev/null && [ $i -lt 30 ]; do sleep 0.5; i=$((i + 1)); done
+    kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null
+    ok "Stopped $name (pid $p)"
+  fi
+  rm -f "$f"
+  return 0
+}
+
+active_profile() { if [ -s "$STATE/profile" ]; then cat "$STATE/profile"; else echo default; fi; }
+
+check_profile() {
+  H profile "$PROFILES" "$1" quant >/dev/null 2>&1 \
+    || die "Unknown profile '$1'. Profiles: $(H profiles "$PROFILES" | cut -f1 | tr '\n' ' ')" "./lab model default"
+}
+
+# ---------------------------------------------------------------- platform checks
+
+check_platform() {
+  if mock; then dim "LAB_MOCK=1: skipping macOS checks ($OS $(uname -m))"; return 0; fi
+  is_mac || die "This command needs macOS on Apple silicon. To test on Linux use the fake model." "LAB_MOCK=1 ./lab ${CMD:-help}"
+  if [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = 1 ]; then
+    die "Terminal is running under Rosetta (Intel mode)." "Quit Terminal, in Finder > Applications > Utilities > Terminal > Get Info uncheck 'Open using Rosetta', reopen it, then: ./lab ${CMD:-setup}"
+  fi
+  [ "$(uname -m)" = arm64 ] || die "This Mac is not Apple silicon (uname -m says $(uname -m))." "./lab help"
+}
+
+ensure_wired() {  # raise the GPU wired-memory limit (asks for the login password once; resets on reboot)
+  mock && return 0
+  local need cur
+  need="$(H profile "$PROFILES" default wired_limit_mb)"
+  cur="$(wired_limit_mb)"
+  if [ -z "$cur" ]; then warn "Cannot read iogpu.wired_limit_mb on this macOS; continuing."; return 0; fi
+  if [ "$cur" -ge "$need" ] 2>/dev/null; then ok "GPU memory limit: $cur MB"; return 0; fi
+  warn "GPU memory limit is the macOS default (about 2/3 of RAM). Glimmer needs $need MB,"
+  info "otherwise llama.cpp quietly moves layers to the CPU and runs several times slower."
+  info "The setting resets when the Mac restarts. sudo asks for your Mac login password."
+  if [ "${1:-}" = "check-only" ]; then warn "Not changed (dry run). Command: sudo sysctl iogpu.wired_limit_mb=$need"; return 0; fi
+  if confirm "Run: sudo sysctl iogpu.wired_limit_mb=$need"; then
+    sudo sysctl iogpu.wired_limit_mb="$need" >/dev/null || die "sudo sysctl failed." "sudo sysctl iogpu.wired_limit_mb=$need"
+    ok "GPU memory limit set to $need MB (until the next restart)"
+  else
+    die "GPU memory limit not raised." "sudo sysctl iogpu.wired_limit_mb=$need"
+  fi
+}
+
+power_checks() {
+  if mock || ! is_mac; then return 0; fi
+  if pmset -g batt 2>/dev/null | head -n 1 | grep -q "AC Power"; then
+    ok "On AC power"
+  else
+    warn "Running on battery. Plug in the charger; macOS slows the GPU on battery."
+  fi
+  if [ "$(pmset -g 2>/dev/null | awk '/lowpowermode/ {print $2; exit}')" = 1 ]; then
+    warn "Low Power Mode is on and slows the GPU. Turn it off: System Settings > Battery > Low Power Mode > Never."
+  fi
+}
+
+keep_awake() {  # keep_awake [pid]  -> caffeinate -dims until that pid (default: this script) exits
+  if mock || ! is_mac || ! have caffeinate; then return 0; fi
+  caffeinate -dims -w "${1:-$$}" >/dev/null 2>&1 &
+  echo $! > "$STATE/caffeinate.pid"
+  ok "Keeping the Mac awake (caffeinate -dims). Leave the lid open."
+}
+
+# ---------------------------------------------------------------- model files
+
+check_files() {  # check_files profile -> dies if any file is missing or the wrong size (no hashing)
+  local prof="$1" name size sha url missing="" have_sz
+  while IFS="$(printf '\t')" read -r name size sha url; do
+    have_sz="$(file_size "$GLIMMER_DIR/$name")"
+    [ "$have_sz" = "$size" ] || missing="$missing $name"
+  done <<EOF
+$(H files "$PROFILES" "$prof")
+EOF
+  [ -z "$missing" ] || die "Model files missing or incomplete for profile $prof:$missing" "./lab download $prof"
+}
+
+verify_file() {  # verify_file path size sha -> 0 if the sha256 matches (cached by size+mtime)
+  local f="$1" size="$2" sha="$3" mark stampv got
+  mark="$STATE/verified/$(basename "$f").ok"
+  stampv="$size $(file_mtime "$f") $sha"
+  if [ -f "$mark" ] && [ "$(cat "$mark")" = "$stampv" ]; then return 0; fi
+  info "Checking the sha256 of $(basename "$f") ($(gb "$size") GB, about a minute)..."
+  got="$(sha256_of "$f")"
+  if [ "$got" = "$sha" ]; then
+    mkdir -p "$STATE/verified"; echo "$stampv" > "$mark"; return 0
+  fi
+  return 1
+}
+
+cmd_download() {
+  local profs="$*" name size sha url cur need=0 avail_kb rc
+  [ -n "$profs" ] || profs="default"
+  for p in $profs; do [ "$p" = all ] || check_profile "$p"; done
+  step "Download model files for: $profs  ->  $GLIMMER_DIR"
+  info "From Hugging Face, no login. Resumable: if it stops, run the same command again."
+  mkdir -p "$GLIMMER_DIR"
+  local list
+  # shellcheck disable=SC2086  # profile names are single words, split on purpose
+  list="$(H files "$PROFILES" $profs)" || die "Could not read mac/profiles.json." "git status"
+  while IFS="$(printf '\t')" read -r name size sha url; do
+    cur="$(file_size "$GLIMMER_DIR/$name")"
+    [ "$cur" -lt "$size" ] && need=$((need + size - cur))
+  done <<EOF
+$list
+EOF
+  avail_kb="$(df -Pk "$GLIMMER_DIR" | awk 'NR == 2 {print $4}')"
+  info "Disk: $(df -h "$HOME" | awk 'NR == 2 {print $4 " free on " $NF}'); still to download: $(gb "$need") GB"
+  if mock; then dim "LAB_MOCK=1: not downloading anything"; return 0; fi
+  if [ $((need / 1024 + 2000000)) -gt "${avail_kb:-0}" ]; then
+    die "Not enough free disk space: need $(gb "$need") GB plus 2 GB spare." "Free up space (empty the Trash), then ./lab download $profs"
+  fi
+  need_cmd curl
+  while IFS="$(printf '\t')" read -r name size sha url; do
+    local dest="$GLIMMER_DIR/$name"
+    cur="$(file_size "$dest")"
+    if [ "$cur" -gt "$size" ]; then
+      mv -f "$dest" "$dest.bad"; warn "$name was larger than expected; moved it to $name.bad"; cur=0
+    fi
+    if [ "$cur" = "$size" ] && verify_file "$dest" "$size" "$sha"; then
+      ok "$name ($(gb "$size") GB, sha256 ok)"; continue
+    fi
+    if [ "$cur" = "$size" ]; then
+      mv -f "$dest" "$dest.bad"; warn "$name failed its checksum; moved it to $name.bad and downloading again"
+    fi
+    info "Downloading $name ($(gb "$size") GB)"
+    if [ -t 1 ]; then
+      curl -L -C - --fail --retry 5 --retry-delay 10 --progress-bar -o "$dest" "$url"; rc=$?
+    else
+      curl -L -C - --fail --retry 5 --retry-delay 10 -sS -o "$dest" "$url"; rc=$?
+    fi
+    [ $rc -eq 0 ] || die "Download of $name stopped (curl exit $rc). Nothing is lost." "./lab download $profs"
+    if verify_file "$dest" "$size" "$sha"; then
+      ok "$name (sha256 ok)"
+    else
+      mv -f "$dest" "$dest.bad"
+      die "$name does not match the sha256 published on Hugging Face; moved it to $name.bad." "./lab download $profs"
+    fi
+  done <<EOF
+$list
+EOF
+  ok "All files for $profs are present and verified."
+  info "Next: ./lab smoke"
+}
+
+# ---------------------------------------------------------------- model server
+
+server_log_now() {  # the part of server.log written since the current server started
+  local s; s="$(cat "$STATE/server.logline" 2>/dev/null || echo 0)"
+  tail -n +"$((s + 1))" "$SERVER_LOG" 2>/dev/null
+}
+metal_wss() { server_log_now | sed -n 's/.*recommendedMaxWorkingSetSize *= *\([0-9.]*\) *MB.*/\1/p' | head -n 1; }
+gpu_layers() { server_log_now | sed -n 's/.*offloaded \([0-9]*\/[0-9]*\) layers to GPU.*/\1/p' | tail -n 1; }
+
+metal_report() {
+  mock && return 0
+  local wss layers a b
+  wss="$(metal_wss)"; layers="$(gpu_layers)"
+  [ -n "$wss" ] && ok "Metal recommendedMaxWorkingSetSize: $wss MB"
+  if [ -n "$layers" ]; then
+    a="${layers%/*}"; b="${layers#*/}"
+    if [ "$a" = "$b" ]; then ok "All $b layers are on the GPU"
+    else warn "Only $a of $b layers are on the GPU; the rest run on the CPU (slow)."
+      info "Fix: sudo sysctl iogpu.wired_limit_mb=20480, then ./lab stop and start the model again."
+    fi
+  fi
+}
+
+server_running_profile() { cat "$STATE/server.profile" 2>/dev/null; }
+
+cmd_model() {
+  local prof="${1:-$(active_profile)}" pid code t0 waited=0 lines
+  check_profile "$prof"
+  mkdir -p "$STATE"
+  if pid_alive "$STATE/server.pid"; then
+    if [ "$(server_running_profile)" = "$prof" ] && [ "$(health)" = 200 ]; then
+      ok "Model already running: profile $prof, $BASE_URL"; return 0
+    fi
+    info "Restarting the model server with profile $prof"
+    stop_pidfile "$STATE/server.pid" "model server"
+  fi
+  code="$(health)"
+  if [ "$code" != "000" ] && [ -n "$code" ]; then
+    die "Something else is already answering on port $PORT." "lsof -nP -iTCP:$PORT -sTCP:LISTEN   (quit that program, then ./lab model $prof)"
+  fi
+  local -a cmd
+  if mock; then
+    need_fs
+    cmd=("$FS" mock-llm --port "$PORT")
+    step "Starting the fake model server (LAB_MOCK=1)"
+  else
+    check_platform
+    need_cmd llama-server llama.cpp
+    local b; b="$(llama_build)"
+    if [ -n "$b" ] && [ "$b" -lt "$MIN_LLAMA_BUILD" ]; then
+      die "llama.cpp build $b is too old for Muse Glimmer (needs $MIN_LLAMA_BUILD or newer)." "brew upgrade llama.cpp"
+    fi
+    check_files "$prof"
+    ensure_wired
+    local a
+    while IFS= read -r a; do cmd+=("$a"); done <<EOF
+$(H server-args "$PROFILES" "$prof" "$GLIMMER_DIR" "$PORT")
+EOF
+    [ "${#cmd[@]}" -gt 4 ] || die "Could not build the llama-server command for profile $prof." "./lab model default"
+    cmd=(llama-server "${cmd[@]}")
+    step "Starting Muse Glimmer 30B: profile $prof ($(H profile "$PROFILES" "$prof" description))"
+  fi
+  swap_used_mb > "$STATE/swap_baseline"
+  touch "$SERVER_LOG"
+  wc -l < "$SERVER_LOG" | tr -d ' ' > "$STATE/server.logline"
+  printf '\n==== %s lab: start profile=%s\n' "$(date)" "$prof" >> "$SERVER_LOG"
+  printf '%s\n' "${cmd[@]}" > "$STATE/server.cmd"
+  dim "${cmd[*]}"
+  t0="$(now)"
+  nohup "${cmd[@]}" >> "$SERVER_LOG" 2>&1 < /dev/null &
+  pid=$!
+  echo "$pid" > "$STATE/server.pid"
+  echo "$prof" > "$STATE/server.profile"
+  info "Loading (log: $SERVER_LOG). This takes 20-90 s."
+  while :; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$STATE/server.pid"
+      lines="$(tail -n 25 "$SERVER_LOG")"
+      printf '%s\n' "$lines" | sed 's/^/        | /'
+      die "The model server exited while loading (last log lines above)." "./lab model $prof   (if it fails again: ./lab model small)"
+    fi
+    [ "$(health)" = 200 ] && break
+    waited=$(($(now) - t0))
+    if [ "$waited" -gt "${LAB_LOAD_TIMEOUT:-600}" ]; then
+      die "The model server did not become ready in $waited s." "./lab stop && ./lab model $prof"
+    fi
+    sleep 2
+  done
+  echo $(($(now) - t0)) > "$STATE/server.load_s"
+  ok "Model ready in $(cat "$STATE/server.load_s") s: $BASE_URL (profile $prof)"
+  metal_report
+  return 0
+}
+
+stop_server() { stop_pidfile "$STATE/server.pid" "model server" || true; rm -f "$STATE/server.profile"; }
+
+cmd_stop() {
+  step "Stopping"
+  stop_pidfile "$STATE/serve.pid" "live console" || true
+  stop_server
+  stop_pidfile "$STATE/caffeinate.pid" "keep-awake" || true
+  ok "Nothing from ./lab is running now."
+}
+
+# ---------------------------------------------------------------- running things while watching swap
+
+# run_watched LIMIT_MB BASE_MB cmd...   Runs cmd in the background, samples swap every 5 s and keeps the
+# largest growth over BASE_MB in $STATE/swap_max_growth. If LIMIT_MB > 0 and growth passes it, the command
+# is stopped and $STATE/swap_killed is written. Ctrl-C stops the command. Sets RUN_RC and INTERRUPTED.
+run_watched() {
+  local limit="$1" base="$2" watcher
+  shift 2
+  echo 0 > "$STATE/swap_max_growth"; rm -f "$STATE/swap_killed"
+  INTERRUPTED=0
+  "$@" &
+  CHILD=$!
+  trap 'INTERRUPTED=1; kill "$CHILD" 2>/dev/null' INT TERM
+  (
+    while kill -0 "$CHILD" 2>/dev/null; do
+      g=$(( $(swap_used_mb) - base ))
+      m="$(cat "$STATE/swap_max_growth" 2>/dev/null || echo 0)"
+      [ "$g" -gt "${m:-0}" ] && echo "$g" > "$STATE/swap_max_growth"
+      if [ "$limit" -gt 0 ] && [ "$g" -gt "$limit" ]; then
+        echo "$g" > "$STATE/swap_killed"; kill "$CHILD" 2>/dev/null; break
+      fi
+      sleep 5
+    done
+  ) &
+  watcher=$!
+  wait "$CHILD"; RUN_RC=$?
+  if kill -0 "$CHILD" 2>/dev/null; then wait "$CHILD"; RUN_RC=$?; fi
+  kill "$watcher" 2>/dev/null; wait "$watcher" 2>/dev/null
+  trap - INT TERM
+  [ "$INTERRUPTED" = 1 ] && RUN_RC=130
+  return 0
+}
+
+fs_has_flag() { "$FS" "$1" --help 2>&1 | grep -q -- "$2"; }
+
+# Arguments every campaign gets: mock runs must say so (run ids get the mock- prefix, headers say mode mock).
+fs_mode_args() { if mock; then echo "--mode mock"; fi; }
+
+# Run headers take the GGUF sha256 and the exact server command from these variables (fortyshots/attest.py).
+# The sha256 is only exported after lab has checked the file against Hugging Face's published value.
+attest_env() {
+  mock && return 0
+  local prof f size sha flags
+  prof="$(server_running_profile)"; [ -n "$prof" ] || return 0
+  f="$GLIMMER_DIR/$(H profile "$PROFILES" "$prof" model)"
+  size="$(H profile "$PROFILES" "$prof" model_size)"; sha="$(H profile "$PROFILES" "$prof" model_sha256)"
+  if [ "$(file_size "$f")" = "$size" ] && verify_file "$f" "$size" "$sha"; then
+    export FORTYSHOTS_GGUF_SHA256="$sha"
+  else
+    die "$(basename "$f") does not match the sha256 published on Hugging Face." "./lab download $prof"
+  fi
+  flags=""
+  while IFS= read -r a; do flags="$flags $(printf '%q' "$a")"; done < "$STATE/server.cmd"
+  flags="${flags# }"
+  local tilde="~"   # show ~ instead of the home folder (and the user name) in published headers
+  export FORTYSHOTS_SERVER_FLAGS="${flags//$HOME/$tilde}"
+}
+
+# ---------------------------------------------------------------- smoke
+
+cmd_smoke() {
+  local prof="" keep=0 out swap0 swap1 mem0 mem1 ts k v
+  for a in "$@"; do case "$a" in --keep) keep=1 ;; *) prof="$a" ;; esac; done
+  [ -n "$prof" ] || prof="$(active_profile)"
+  check_profile "$prof"
+  step "Smoke test: llama-server + Muse Glimmer 30B, profile $prof"
+  check_platform
+  need_py
+  swap0="$(swap_used_mb)"; mem0="$(mem_free_pct)"
+  cmd_model "$prof"
+  step "One chat call (17 x 23, low reasoning)"
+  out="$(H chat "$BASE_URL")" || die "The chat call failed." "tail -n 40 $SERVER_LOG"
+  local s_content="" s_ok="" s_dec="" s_pre="" s_secs="" s_rchars="" s_fin="" s_predn=""
+  while IFS='=' read -r k v; do
+    case "$k" in
+      content) s_content="$v" ;; correct) s_ok="$v" ;; predicted_per_second) s_dec="$v" ;;
+      prompt_per_second) s_pre="$v" ;; seconds) s_secs="$v" ;; reasoning_chars) s_rchars="$v" ;;
+      finish_reason) s_fin="$v" ;; predicted_n) s_predn="$v" ;;
+    esac
+  done <<EOF
+$out
+EOF
+  swap1="$(swap_used_mb)"; mem1="$(mem_free_pct)"
+  info "answer:            $s_content  (correct: $s_ok; finish_reason: $s_fin)"
+  info "reasoning:         $s_rchars characters (reasoning_content is separate, as expected)"
+  info "decode speed:      ${s_dec:-?} tok/s   (generated $s_predn tokens)"
+  info "prompt speed:      ${s_pre:-?} tok/s"
+  info "call took:         $s_secs s; model load took $(cat "$STATE/server.load_s" 2>/dev/null) s"
+  info "swap used:         $swap0 MB before -> $swap1 MB after"
+  info "memory free:       ${mem0:-?}% before -> ${mem1:-?}% after"
+  if ! mock; then
+    info "GPU memory limit:  $(wired_limit_mb) MB; recommendedMaxWorkingSetSize: $(metal_wss) MB; GPU layers: $(gpu_layers)"
+    info "llama.cpp build:   $(llama_build)"
+  fi
+  [ "$s_ok" = yes ] || warn "The answer was not 391. Glimmer may be misconfigured; the report is saved for Claude to read."
+  ts="$(stamp)"
+  mkdir -p "$REPO/doctor"
+  H write-json "$REPO/doctor/$ts-smoke.json" kind=smoke "ts=$ts" "lab_version=$LAB_VERSION" "mock=$([ "$MOCK" = 1 ] && echo true || echo false)" \
+    "profile=$prof" "machine.chip=$(machine_chip)" "machine.ram_gb=$(machine_ram_gb)" "machine.os=$(machine_os)" \
+    "llama_build=$(mock || llama_build)" "server_cmd=$(tr '\n' ' ' < "$STATE/server.cmd")" \
+    "load_s=$(cat "$STATE/server.load_s" 2>/dev/null)" "answer=$s_content" "correct=$s_ok" "finish_reason=$s_fin" \
+    "reasoning_chars=${s_rchars:-null}" "decode_tok_s=${s_dec:-null}" "prompt_tok_s=${s_pre:-null}" "call_s=${s_secs:-null}" \
+    "memory.swap_before_mb=$swap0" "memory.swap_after_mb=$swap1" "memory.free_pct_before=${mem0:-null}" "memory.free_pct_after=${mem1:-null}" \
+    "memory.wired_limit_mb=$(wired_limit_mb)" "memory.recommended_max_working_set_mb=$(metal_wss)" "memory.gpu_layers=$(gpu_layers)" \
+    "network=$(net_state)"
+  ok "Saved doctor/$ts-smoke.json"
+  if [ "$keep" = 0 ]; then stop_server; else info "Model left running (./lab stop to stop it)."; fi
+  info "Next (tomorrow): ./lab setup"
+  push_runs all || true
+  return 0
+}
+
+# ---------------------------------------------------------------- doctor
+
+cmd_doctor() {
+  local rehearse=0 prof="" ts out base swap_now growth maxg verdict="ok" next="" fb rc
+  for a in "$@"; do case "$a" in --rehearse) rehearse=1 ;; *) prof="$a" ;; esac; done
+  if [ "$rehearse" = 1 ]; then rehearse "${prof:-live}"; return $?; fi
+  [ -n "$prof" ] || prof="$(active_profile)"
+  check_profile "$prof"
+  need_fs; need_py
+  step "Doctor: profile $prof"
+  check_platform
+  ensure_wired
+  power_checks
+  base="$(swap_used_mb)"
+  if enforce_swap && [ "$base" -gt "$SWAP_LIMIT_MB" ]; then
+    warn "Swap is already $(mb_to_gb "$base") GB before loading the model. Restarting the Mac clears it"
+    info "(after a restart run: sudo sysctl iogpu.wired_limit_mb=20480). Doctor measures growth from here."
+  fi
+  local mem0; mem0="$(mem_free_pct)"
+  keep_awake
+  cmd_model "$prof"
+  ts="$(stamp)"; mkdir -p "$REPO/doctor"
+  out="$REPO/doctor/$ts.json"
+  rm -f "$REPO/doctor/report.json"
+  local -a hash_arg=()
+  if ! mock; then hash_arg=(--hash-gguf "$GLIMMER_DIR/$(H profile "$PROFILES" "$prof" model)"); fi
+  step "Model checks (fortyshots doctor): tools, json_schema, vision, reasoning, speed"
+  local limit=$SWAP_LIMIT_MB; enforce_swap || limit=0
+  # doctor/report.json is also what campaigns read for their attestation header.
+  run_watched "$limit" "$base" "$FS" doctor --base-url "$BASE_URL" --out "$REPO/doctor/report.json" "${hash_arg[@]}"
+  rc=$RUN_RC
+  swap_now="$(swap_used_mb)"; growth=$((swap_now - base)); maxg="$(cat "$STATE/swap_max_growth" 2>/dev/null || echo 0)"
+  [ "$growth" -gt "$maxg" ] && maxg=$growth
+  if [ "$INTERRUPTED" = 1 ]; then verdict="interrupted"; next="./lab doctor"
+  elif enforce_swap && { [ -f "$STATE/swap_killed" ] || [ "$maxg" -gt "$SWAP_LIMIT_MB" ]; }; then
+    verdict="swap"; fb="$(H profile "$PROFILES" "$prof" fallback)"
+  elif [ "$rc" -ne 0 ]; then verdict="fail"; next="./lab doctor   (after Claude pushes a fix, run ./lab update first)"
+  fi
+  H write-json "$out" kind=doctor "ts=$ts" "lab_version=$LAB_VERSION" "mock=$([ "$MOCK" = 1 ] && echo true || echo false)" \
+    "verdict=$verdict" "profile=$prof" "profile_spec.quant=$(H profile "$PROFILES" "$prof" quant)" \
+    "profile_spec.ctx=$(H profile "$PROFILES" "$prof" ctx)" "profile_spec.est_total_gb=$(H profile "$PROFILES" "$prof" est_total_gb)" \
+    "profile_spec.draft=$(H profile "$PROFILES" "$prof" draft)" \
+    "server_cmd=$(tr '\n' ' ' < "$STATE/server.cmd")" "llama_build=$(mock || llama_build)" \
+    "load_s=$(cat "$STATE/server.load_s" 2>/dev/null)" \
+    "machine.chip=$(machine_chip)" "machine.ram_gb=$(machine_ram_gb)" "machine.os=$(machine_os)" \
+    "memory.wired_limit_mb=$(wired_limit_mb)" "memory.recommended_max_working_set_mb=$(metal_wss)" \
+    "memory.gpu_layers=$(gpu_layers)" "memory.swap_before_mb=$base" "memory.swap_after_mb=$swap_now" \
+    "memory.swap_max_growth_mb=$maxg" "memory.swap_limit_mb=$SWAP_LIMIT_MB" \
+    "memory.free_pct_before=${mem0:-null}" "memory.free_pct_after=$(mem_free_pct)" \
+    "network=$(net_state)" "fortyshots_exit=$rc" "fortyshots@=$REPO/doctor/report.json"
+  server_log_now | tail -n 300 > "$REPO/doctor/$ts.server.log"
+  step "Doctor result: $verdict"
+  info "swap growth while loaded: $(mb_to_gb "$maxg") GB (limit $(mb_to_gb "$SWAP_LIMIT_MB") GB)"
+  local est; est="$(H json-get "$REPO/doctor/report.json" estimate.campaign_minutes)"
+  [ -n "$est" ] && info "estimated minutes per A5 campaign: $est (the pilot measures it for real)"
+  ok "Report: doctor/$ts.json"
+  if [ "$verdict" = swap ]; then
+    push_runs all || true
+    [ -n "$fb" ] || die "Swap grew past 1 GB even on the smallest profile ($prof)." \
+      "Quit other apps (browser, Slack), restart the Mac, then: sudo sysctl iogpu.wired_limit_mb=20480 && ./lab doctor"
+    echo "$fb" > "$STATE/profile"
+    warn "Swap grew by $(mb_to_gb "$maxg") GB on profile $prof. Switched the default profile to $fb."
+    stop_server
+    check_files_quiet "$fb" || die "Profile $fb needs its model file first." "./lab download $fb && ./lab doctor"
+    [ "${LAB_DOCTOR_DEPTH:-0}" -lt 2 ] || die "Swap is still too high after switching profile twice." \
+      "Quit other apps, restart the Mac, then: sudo sysctl iogpu.wired_limit_mb=20480 && ./lab doctor"
+    info "Running doctor again with profile $fb."
+    export LAB_DOCTOR_DEPTH=$((${LAB_DOCTOR_DEPTH:-0} + 1))
+    exec "$REPO/lab" doctor "$fb"
+  fi
+  if [ "$verdict" = ok ]; then
+    ok "Doctor passed. The model stays loaded."
+    info "Next: ./lab pilot"
+  fi
+  push_runs all
+  local pushed=$?
+  [ "$verdict" = ok ] || die "Doctor did not pass ($verdict). The report is in doctor/$ts.json$([ $pushed = 0 ] && echo ' and was pushed for Claude to read')." "$next"
+  return 0
+}
+
+check_files_quiet() {
+  local name size sha url
+  while IFS="$(printf '\t')" read -r name size sha url; do
+    [ "$(file_size "$GLIMMER_DIR/$name")" = "$size" ] || return 1
+  done <<EOF
+$(H files "$PROFILES" "$1")
+EOF
+  return 0
+}
+
+rehearse() {
+  local prof="$1" ts base maxg seed run_dir speed
+  check_profile "$prof"
+  need_fs; need_py
+  step "Rehearsal: one live round with the browser and screen recording open (profile $prof)"
+  check_platform; ensure_wired; power_checks
+  base="$(swap_used_mb)"
+  live_up "$prof"
+  if [ -t 0 ]; then
+    info "1. Start a screen recording now: press Cmd-Shift-5, choose Record Entire Screen, click Record."
+    info "2. In the browser, press a to approve each batch when the console asks."
+    printf '        Press Enter when the recording is running... '; read -r _
+  fi
+  seed="$(next_demo_seed)"
+  local -a extra
+  if fs_has_flag run --rounds; then extra=(--rounds 1); else extra=(--max-minutes 12); fi
+  local mode=live; mock && mode=mock
+  attest_env
+  run_watched 0 "$base" "$FS" run --arm A5 --pool P0 --seed "$seed" --mode "$mode" --base-url "$BASE_URL" "${extra[@]}"
+  maxg="$(cat "$STATE/swap_max_growth" 2>/dev/null || echo 0)"
+  run_dir="$(H runs "$REPO/runs" 0 | awk -F'\t' -v p="A5-P0-s$seed-" 'index($1, p) > 0 {r = $1} END {print r}')"
+  speed=""; [ -n "$run_dir" ] && speed="$(H run-speed "$REPO/runs/$run_dir")"
+  ts="$(stamp)"
+  H write-json "$REPO/doctor/$ts-rehearse.json" kind=rehearse "ts=$ts" "profile=$prof" "run_id=$run_dir" \
+    "exit=$RUN_RC" "memory.swap_before_mb=$base" "memory.swap_max_growth_mb=$maxg" "memory.warn_mb=$REHEARSE_SWAP_MB" \
+    "memory.free_pct_after=$(mem_free_pct)" "speed_median_decode_prefill_n=$speed" "network=$(net_state)" \
+    "mock=$([ "$MOCK" = 1 ] && echo true || echo false)"
+  step "Rehearsal result"
+  info "run: ${run_dir:-none}; exit code $RUN_RC; median decode/prefill tok/s and calls: ${speed:-?}"
+  info "swap growth with browser + recording: $(mb_to_gb "$maxg") GB"
+  if [ "$maxg" -gt "$REHEARSE_SWAP_MB" ] && ! mock; then
+    warn "Swap grew more than 0.5 GB. For the video: quit every app except the browser and QuickTime,"
+    info "or use the smaller model: ./lab stop && ./lab live small"
+  else
+    ok "Memory held up."
+  fi
+  info "Stop the screen recording (Cmd-Ctrl-Esc) and delete it; this was only a rehearsal."
+  push_runs all
+}
+
+# ---------------------------------------------------------------- live console
+
+next_demo_seed() {  # demo runs on P0 use seeds 90+ so they never collide with pilot seeds
+  local s=90
+  while ls -d "$REPO/runs/A5-P0-s$s-"* >/dev/null 2>&1 || ls -d "$REPO/runs/mock-A5-P0-s$s-"* >/dev/null 2>&1; do s=$((s + 1)); done
+  echo "$s"
+}
+
+live_url() { echo "http://127.0.0.1:$SERVE_PORT/?live=1#/console"; }
+
+live_up() {  # live_up profile: model + console server + browser
+  local prof="$1" i=0
+  local net; net="$(net_state)"
+  keep_awake
+  cmd_model "$prof"
+  if pid_alive "$STATE/serve.pid"; then
+    ok "Live console already running"
+  else
+    step "Starting the live console on port $SERVE_PORT"
+    nohup "$FS" serve --port "$SERVE_PORT" >> "$SERVE_LOG" 2>&1 < /dev/null &
+    echo $! > "$STATE/serve.pid"
+    keep_awake "$(cat "$STATE/serve.pid")"
+    while [ "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$SERVE_PORT/api/runs" 2>/dev/null)" != 200 ]; do
+      i=$((i + 1))
+      if ! pid_alive "$STATE/serve.pid" || [ $i -gt 30 ]; then
+        tail -n 20 "$SERVE_LOG" | sed 's/^/        | /'
+        die "The live console did not start (log above)." "./lab stop && ./lab live"
+      fi
+      sleep 1
+    done
+    ok "Live console: $(live_url)"
+  fi
+  if is_mac && ! mock; then open "$(live_url)"
+  elif have xdg-open && [ -n "${DISPLAY:-}" ]; then xdg-open "$(live_url)" >/dev/null 2>&1 &
+  else info "Open in a browser: $(live_url)"; fi
+  info "network: $net"
+  if [ "$net" != off ]; then
+    info "The network is on, so runs started now will record network: $net. Only runs whose header"
+    info "says network: off may be shown as 'Wi-Fi off'. Turn Wi-Fi off first if you want that."
+  fi
+}
+
+cmd_live() {
+  local sub="${1:-}"
+  need_fs; need_py
+  if [ "$sub" = run ]; then
+    [ "$(health)" = 200 ] || die "The model is not running." "./lab live"
+    local seed; seed="$(next_demo_seed)"
+    local -a extra
+    if fs_has_flag run --rounds; then extra=(--rounds 1); fi
+    step "Demo campaign: A5 on the dev pool P0, seed $seed (not part of the benchmark)"
+    info "Approve each batch in the browser with a. Ctrl-C stops the campaign."
+    info "network: $(net_state)"
+    local mode=live; mock && mode=mock
+    attest_env
+    "$FS" run --arm A5 --pool P0 --seed "$seed" --mode "$mode" --base-url "$BASE_URL" "${extra[@]}"
+    local rc=$?
+    if [ $rc -eq 0 ]; then ok "Demo campaign finished."; else warn "The demo campaign ended with code $rc."; fi
+    push_runs all || true
+    return 0
+  fi
+  local prof="${sub:-live}"
+  check_profile "$prof"
+  step "Live mode: profile $prof"
+  check_platform; ensure_wired; power_checks
+  live_up "$prof"
+  step "Ready"
+  info "Start a demo campaign:   ./lab live run"
+  info "Stop everything:         ./lab stop"
+}
+
+# ---------------------------------------------------------------- record
+
+plan_names() { local f n=""; for f in "$PLANS_DIR"/*.json; do [ -f "$f" ] && n="$n $(basename "$f" .json)"; done; echo "${n# }"; }
+
+resolve_plan() {  # prints the plan file path for a name or a path
+  local p="$1"
+  if [ -f "$p" ]; then (cd "$(dirname "$p")" && echo "$(pwd -P)/$(basename "$p")"); return 0; fi
+  if [ -f "$ORIG_PWD/$p" ]; then (cd "$(dirname "$ORIG_PWD/$p")" && echo "$(pwd -P)/$(basename "$p")"); return 0; fi
+  if [ -f "$PLANS_DIR/$p.json" ]; then echo "$PLANS_DIR/$p.json"; return 0; fi
+  return 1
+}
+
+maybe_update() {  # update the code before a recording night; re-runs this command if anything changed
+  [ "${LAB_UPDATED:-0}" = 1 ] && return 0
+  [ "${LAB_NO_UPDATE:-0}" = 1 ] && return 0
+  remote_reachable || { dim "No network: not checking GitHub for code updates."; return 0; }
+  git fetch -q origin main 2>/dev/null || { warn "Could not reach GitHub to check for code updates."; return 0; }
+  local behind; behind="$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
+  if [ "${behind:-0}" -gt 0 ]; then
+    info "The code is $behind commit(s) behind GitHub. Updating first."
+    cmd_update || die "The update failed." "./lab update"
+    export LAB_UPDATED=1
+    exec "$REPO/lab" "$@"
+  fi
+  ok "Code is up to date ($(git rev-parse --short HEAD))"
+}
+
+pusher_loop() {  # background: push finished runs while a recording is going
+  local tick=0
+  while [ -f "$STATE/recording" ]; do
+    sleep 5; tick=$((tick + 1))
+    [ $((tick % 12)) -eq 0 ] || continue
+    if [ -n "$(find "$REPO/runs" -name summary.json -newer "$STATE/push_marker" 2>/dev/null | head -n 1)" ]; then
+      touch "$STATE/push_marker"
+      printf '\n[lab] a campaign finished; pushing it: %s\n' "$(push_runs finished 2>&1 | tail -n 1)"
+    fi
+  done
+}
+
+cmd_record() {
+  local plan="${1:-}" pf pname n ts rlog started attempt=0 prof rc=0 pusher
+  [ -n "$plan" ] || die "Which plan? Plans: $(plan_names)" "./lab record main"
+  pf="$(resolve_plan "$plan")" || die "No plan called '$plan'. Plans: $(plan_names)" "./lab record main"
+  pname="$(basename "$pf" .json)"
+  need_fs; need_py
+  n="$(H plan "$pf" | wc -l | tr -d ' ')" || die "Plan $pf is not valid." "git status"
+  maybe_update record "$@"
+  check_platform
+  power_checks
+  ensure_wired
+  ts="$(stamp)"; mkdir -p "$REPO/doctor" "$REPO/runs"
+  rlog="$REPO/doctor/$ts-record-$pname.log"
+  NO_COLOR=1; set_colors
+  exec > >(tee -i -a "$rlog") 2>&1
+  step "Recording plan '$pname': $n campaigns (log: doctor/$ts-record-$pname.log)"
+  H plan "$pf" | awk -F'\t' '{printf "        %2d. %s on %s, seed %s\n", NR, $1, $2, $3}'
+  info "Finished campaigns are skipped and unfinished ones resume, so running this again is safe."
+  local net0; net0="$(net_state)"
+  info "network: $net0"
+  keep_awake
+  prof="$(active_profile)"
+  cmd_model "$prof"
+  attest_env
+  started="$(now)"
+  echo "$pname $$ $started" > "$STATE/recording"
+  touch "$STATE/push_marker"
+  pusher_loop &
+  pusher=$!
+  local base; base="$(swap_used_mb)"
+  while [ $attempt -lt 3 ]; do
+    attempt=$((attempt + 1))
+    step "fortyshots record $pname (attempt $attempt of 3)"
+    # shellcheck disable=SC2046  # fs_mode_args is empty or two words
+    run_watched 0 "$base" "$FS" record "$pf" --base-url "$BASE_URL" $(fs_mode_args)
+    rc=$RUN_RC
+    [ "$INTERRUPTED" = 1 ] && break
+    [ $rc -eq 0 ] && break
+    warn "fortyshots record stopped with exit code $rc."
+    if [ "$(health)" != 200 ]; then warn "The model server is down; restarting it."; cmd_model "$prof"; attest_env; fi
+    info "Retrying in about a minute (run ids are stamped to the minute)."
+    sleep 65
+  done
+  rm -f "$STATE/recording"
+  wait "$pusher" 2>/dev/null
+  step "Plan '$pname' summary"
+  local runs_out; runs_out="$(H runs "$REPO/runs" "$started")"
+  if [ -n "$runs_out" ]; then
+    printf '%s\n' "$runs_out" | awk -F'\t' '{ if ($2 == "yes") printf "        %-34s %s/%s hits/lookups  %s min\n", $1, $3, $4, $5;
+                                             else printf "        %-34s not finished\n", $1 }'
+  else
+    info "No campaign changed (all were already finished?)"
+  fi
+  local maxg; maxg="$(cat "$STATE/swap_max_growth" 2>/dev/null || echo 0)"
+  info "swap growth during the plan: $(mb_to_gb "$maxg") GB; network now: $(net_state)"
+  H write-json "$REPO/doctor/$ts-record-$pname.json" kind=record "plan=$pname" "ts=$ts" "profile=$prof" \
+    "started=$started" "ended=$(now)" "attempts=$attempt" "exit=$rc" "interrupted=$([ "$INTERRUPTED" = 1 ] && echo true || echo false)" \
+    "network_start=$net0" "network_end=$(net_state)" "memory.swap_before_mb=$base" "memory.swap_max_growth_mb=$maxg" \
+    "mock=$([ "$MOCK" = 1 ] && echo true || echo false)"
+  if [ "${LAB_KEEP_MODEL:-0}" != 1 ]; then stop_server; fi
+  stop_pidfile "$STATE/caffeinate.pid" "keep-awake" >/dev/null 2>&1 || true
+  if [ "$INTERRUPTED" = 1 ]; then
+    warn "Stopped by Ctrl-C. Resume later with: ./lab record $pname"
+  elif [ $rc -ne 0 ]; then
+    warn "Some campaigns did not finish after 3 attempts. Resume with: ./lab record $pname"
+  else
+    ok "Plan '$pname' done."
+  fi
+  push_runs all
+  local prc=$?
+  sleep 1
+  [ $rc -eq 0 ] && [ "$INTERRUPTED" = 0 ] && return $prc
+  return 1
+}
+
+# ---------------------------------------------------------------- git: update, push, media
+
+git_identity() {  # make commits work even if git has no name/email configured
+  if [ -z "$(git config user.email 2>/dev/null)" ]; then
+    export GIT_AUTHOR_NAME="fortyshots-mac" GIT_AUTHOR_EMAIL="fortyshots-mac@users.noreply.github.com"
+    export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+  fi
+}
+
+cmd_update() {
+  local br behind bk p
+  step "Updating the code from GitHub (branch main)"
+  git rev-parse --git-dir >/dev/null 2>&1 || die "This folder is not a git checkout." "gh repo clone <you>/fortyshots ~/fortyshots"
+  remote_reachable || die "No network, or no GitHub remote." "Turn Wi-Fi on, then ./lab update"
+  git fetch -q origin || die "git fetch failed." "git fetch origin"
+  br="$(git symbolic-ref --short -q HEAD)"
+  [ "$br" = main ] || die "This checkout is on branch '$br', not main." "git checkout main && ./lab update"
+  behind="$(git rev-list --count HEAD..origin/main)"
+  if [ "$behind" = 0 ]; then ok "Already up to date ($(git log -1 --format='%h %s'))"; return 0; fi
+  push_runs all >/dev/null 2>&1 || true   # save any unpushed results first
+  bk="$STATE/backup/$(stamp)"
+  # Untracked local files that main now adds (for example runs the lead merged): identical copies go,
+  # different ones are moved aside so the update can proceed.
+  git diff --name-only --diff-filter=A HEAD origin/main | while IFS= read -r p; do
+    [ -e "$p" ] || continue
+    git ls-files --error-unmatch -- "$p" >/dev/null 2>&1 && continue
+    if [ "$(git hash-object -- "$p")" = "$(git rev-parse "origin/main:$p")" ]; then rm -f -- "$p"
+    else mkdir -p "$bk/$(dirname "$p")"; mv -- "$p" "$bk/$p"; warn "Moved local $p to $bk (main has a different version)"; fi
+  done
+  # Tracked files changed both here and on main: keep a copy, take main's.
+  git diff --name-only HEAD origin/main > "$STATE/upstream_changed"
+  git diff --name-only HEAD | while IFS= read -r p; do
+    if grep -qxF -- "$p" "$STATE/upstream_changed"; then
+      mkdir -p "$bk/$(dirname "$p")"; cp -p -- "$p" "$bk/$p" 2>/dev/null; git checkout -q -- "$p"
+      warn "Local edit of $p replaced by main's version (copy kept in $bk)"
+    fi
+  done
+  git merge -q --ff-only origin/main || die "Could not fast-forward to main." "git status   (then tell Claude what it says)"
+  ok "Updated to $(git log -1 --format='%h %s')"
+  if ! mock && [ -z "${LAB_VENV:-}" ] && have uv; then
+    info "Syncing the Python environment"
+    uv sync -q || warn "uv sync failed; run it by hand: uv sync"
+  fi
+  return 0
+}
+
+runs_worktree() { echo "$(git rev-parse --absolute-git-dir)/lab-runs-mac"; }
+
+ensure_worktree() {
+  local wt="$1" base
+  git worktree prune 2>/dev/null
+  if [ -f "$wt/.git" ] && [ "$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null)" = runs-mac ]; then return 0; fi
+  rm -rf "$wt"
+  if git rev-parse -q --verify refs/remotes/origin/runs-mac >/dev/null; then
+    git worktree add -f -B runs-mac "$wt" origin/runs-mac >/dev/null 2>&1
+  elif git rev-parse -q --verify refs/heads/runs-mac >/dev/null; then
+    git worktree add -f "$wt" runs-mac >/dev/null 2>&1
+  else
+    base=origin/main
+    git rev-parse -q --verify refs/remotes/origin/main >/dev/null || base=HEAD
+    git worktree add -f -b runs-mac "$wt" "$base" >/dev/null 2>&1
+  fi
+}
+
+record_push() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M')" "$1" > "$STATE/last_push"; }
+
+not_pushed() {  # not_pushed "reason"
+  [ -n "${1:-}" ] && warn "$1"
+  record_push "NOT PUSHED: ${1:-}"
+  echo "NOT PUSHED: run ./lab push"
+  return 1
+}
+
+# push_runs all|finished : copy new or changed runs/<id>/ folders and doctor/ files into a separate
+# checkout of branch runs-mac, commit, `git pull --rebase` and push (3 tries). Never touches main.
+push_runs() {
+  local mode="${1:-all}" wt units u n=0 i ahead sha big
+  git rev-parse --git-dir >/dev/null 2>&1 || { not_pushed "This folder is not a git checkout."; return 1; }
+  [ -n "$(origin_url)" ] || { not_pushed "No GitHub remote (git remote -v is empty)."; return 1; }
+  remote_reachable || { not_pushed "No network (GitHub is unreachable). Turn Wi-Fi on."; return 1; }
+  git fetch -q origin 2>/dev/null || { not_pushed "git fetch failed (GitHub login?). Try: gh auth status"; return 1; }
+  wt="$(runs_worktree)"
+  ensure_worktree "$wt" || { not_pushed "Could not prepare the runs-mac checkout."; return 1; }
+  units="$(git status --porcelain --untracked-files=all -- runs doctor 2>/dev/null | cut -c4- | sed 's/^"//; s/"$//' \
+    | awk -F/ '$1 == "runs" && NF >= 3 {print $1 "/" $2; next} $1 == "doctor" {print}' | sort -u)"
+  while IFS= read -r u; do
+    [ -n "$u" ] || continue
+    [ -e "$u" ] || continue
+    if [ -d "$u" ]; then
+      [ "$mode" = finished ] && [ ! -f "$u/summary.json" ] && continue
+      mkdir -p "$wt/$u"; cp -R "$u/." "$wt/$u/"
+    else
+      mkdir -p "$wt/$(dirname "$u")"; cp -p "$u" "$wt/$u"
+    fi
+    n=$((n + 1))
+  done <<EOF
+$units
+EOF
+  for d in runs doctor; do
+    [ -d "$wt/$d" ] || continue
+    big="$(find "$wt/$d" -type f -size +95M 2>/dev/null)"
+    if [ -n "$big" ]; then
+      printf '%s\n' "$big" | while IFS= read -r b; do warn "Not pushing ${b#"$wt"/}: larger than 95 MB"; rm -f "$b"; done
+    fi
+  done
+  git_identity
+  local -a paths=()
+  [ -d "$wt/runs" ] && paths+=(runs)
+  [ -d "$wt/doctor" ] && paths+=(doctor)
+  if [ ${#paths[@]} -gt 0 ]; then
+    (cd "$wt" && git add -A -- "${paths[@]}") || { not_pushed "git add failed in $wt"; return 1; }
+  fi
+  if ! git -C "$wt" diff --cached --quiet; then
+    local files; files="$(git -C "$wt" diff --cached --name-only | wc -l | tr -d ' ')"
+    local ids; ids="$(git -C "$wt" diff --cached --name-only | awk -F/ '$1 == "runs" {print $2}' | sort -u | head -n 3 | tr '\n' ' ')"
+    git -C "$wt" commit -q -m "mac: ${ids:-doctor} ($files files, $(date '+%Y-%m-%d %H:%M'))" \
+      || { not_pushed "git commit failed in $wt"; return 1; }
+  fi
+  if git rev-parse -q --verify refs/remotes/origin/runs-mac >/dev/null; then
+    ahead="$(git -C "$wt" rev-list --count origin/runs-mac..HEAD)"
+  else
+    ahead=1
+  fi
+  if [ "$ahead" = 0 ]; then
+    record_push "pushed: nothing new"
+    echo "pushed: nothing new (branch runs-mac is up to date)"
+    return 0
+  fi
+  for i in 1 2 3; do
+    if git ls-remote --exit-code --heads origin runs-mac >/dev/null 2>&1; then
+      if ! git -C "$wt" pull -q --rebase origin runs-mac >/dev/null 2>&1; then
+        git -C "$wt" rebase --abort >/dev/null 2>&1
+        sleep $((i * 3)); continue
+      fi
+    fi
+    if git -C "$wt" push -q origin HEAD:refs/heads/runs-mac >/dev/null 2>&1; then
+      git fetch -q origin runs-mac 2>/dev/null
+      sha="$(git -C "$wt" rev-parse --short HEAD)"
+      record_push "pushed $sha to runs-mac"
+      echo "pushed: $n new or changed item(s) to branch runs-mac ($sha)"
+      return 0
+    fi
+    sleep $((i * 3))
+  done
+  not_pushed "git push to runs-mac failed 3 times. Check: gh auth status"
+  return 1
+}
+
+cmd_push() {
+  step "Pushing runs/ and doctor/ to branch runs-mac"
+  push_runs all
+}
+
+reencode() {  # reencode in outdir -> prints the new path (under 95 MB) or fails
+  local in="$1" dir="$2" base ext dur kbps out
+  base="$(basename "$in")"; base="${base%.*}"
+  ext="$(echo "${in##*.}" | tr '[:upper:]' '[:lower:]')"
+  have ffmpeg || { echo "ffmpeg is missing (brew install ffmpeg)" >&2; return 1; }
+  dur="$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$in" 2>/dev/null)"
+  [ -n "$dur" ] || { echo "ffprobe cannot read $in" >&2; return 1; }
+  case "$ext" in
+    m4a|mp3|wav|aif|aiff|caf|aac)
+      out="$dir/$base.m4a"
+      ffmpeg -y -v error -i "$in" -vn -c:a aac -b:a 128k "$out" >&2 || return 1 ;;
+    *)
+      # aim for 85% of the size limit: video kbit/s = limit * 0.85 * 8 / 1000 / seconds - audio
+      kbps="$(awk -v d="$dur" -v m="$MAX_FILE_BYTES" 'BEGIN { k = int(m * 0.85 * 8 / 1000 / d) - 128; if (k > 8000) k = 8000; if (k < 300) k = 300; print k }')"
+      out="$dir/$base.mp4"
+      echo "        re-encoding $(basename "$in") at ${kbps} kbit/s (H.264, max 1920 px wide)..." >&2
+      ffmpeg -y -v error -stats -i "$in" -c:v libx264 -preset medium -b:v "${kbps}k" -maxrate "${kbps}k" \
+        -bufsize "$((kbps * 2))k" -vf "scale='min(1920,iw)':-2" -pix_fmt yuv420p -c:a aac -b:a 128k \
+        -movflags +faststart "$out" >&2 || return 1 ;;
+  esac
+  [ "$(file_size "$out")" -le "$MAX_FILE_BYTES" ] || { echo "$out is still over the size limit" >&2; return 1; }
+  echo "$out"
+}
+
+cmd_push_media() {
+  local f abs dir parent tree commit i names="" readme
+  [ $# -ge 1 ] || die "Name the files to upload." "./lab push-media voice.m4a live.mov"
+  step "Uploading media to the orphan branch 'media'"
+  git rev-parse --git-dir >/dev/null 2>&1 || die "This folder is not a git checkout." "cd ~/fortyshots && ./lab push-media $*"
+  dir="$STATE/media"; rm -rf "$dir"; mkdir -p "$dir"
+  local -a files=()
+  for f in "$@"; do
+    case "$f" in /*) abs="$f" ;; *) abs="$ORIG_PWD/$f" ;; esac
+    [ -f "$abs" ] || die "File not found: $f" "ls -la \"$(dirname "$abs")\""
+    if [ "$(file_size "$abs")" -gt "$MAX_FILE_BYTES" ]; then
+      warn "$(basename "$abs") is $(gb "$(file_size "$abs")") GB; GitHub takes at most 100 MB per file. Re-encoding."
+      abs="$(reencode "$abs" "$dir")" || die "Re-encoding $(basename "$f") failed." "brew install ffmpeg && ./lab push-media $*"
+      ok "Re-encoded to $(basename "$abs") ($(gb "$(file_size "$abs")") GB)"
+    fi
+    files+=("$abs")
+  done
+  if ! remote_reachable; then
+    warn "No network (GitHub is unreachable). Turn Wi-Fi on."
+    echo "NOT PUSHED: run ./lab push-media $*"; return 1
+  fi
+  git_identity
+  for i in 1 2 3; do
+    git fetch -q origin media 2>/dev/null
+    parent=""
+    git rev-parse -q --verify refs/remotes/origin/media >/dev/null && parent="$(git rev-parse refs/remotes/origin/media)"
+    export GIT_INDEX_FILE="$dir/index"
+    rm -f "$GIT_INDEX_FILE"
+    if [ -n "$parent" ]; then git read-tree "$parent"; else git read-tree --empty; fi
+    names=""
+    for f in "${files[@]}"; do
+      git update-index --add --cacheinfo 100644 "$(git hash-object -w -- "$f")" "media/$(basename "$f")"
+      names="$names $(basename "$f")"
+    done
+    readme="$(git ls-files -s -- media | while read -r _ sha _ path; do printf -- '- %s (blob %s)\n' "${path#media/}" "$sha"; done)"
+    git update-index --add --cacheinfo 100644 \
+      "$(printf '# fortyshots media\n\nRaw recordings from the Mac for the demo video. Not part of the code.\nUpdated %s.\n\n%s\n' "$(date '+%Y-%m-%d %H:%M')" "$readme" | git hash-object -w --stdin)" README.md
+    tree="$(git write-tree)"
+    unset GIT_INDEX_FILE
+    if [ -n "$parent" ]; then commit="$(git commit-tree "$tree" -p "$parent" -m "media:$names")"
+    else commit="$(git commit-tree "$tree" -m "media:$names")"; fi
+    if git push -q origin "$commit:refs/heads/media" >/dev/null 2>&1; then
+      record_push "pushed media:$names"
+      echo "pushed: media:$names to branch media ($(git rev-parse --short "$commit"))"
+      return 0
+    fi
+    sleep $((i * 3))
+  done
+  record_push "NOT PUSHED: media"
+  echo "NOT PUSHED: run ./lab push-media $*"
+  return 1
+}
+
+# ---------------------------------------------------------------- verify, status, setup
+
+cmd_verify() {
+  need_fs
+  step "Recomputing every published number from runs/ and data/ (no model needed)"
+  "$FS" verify || die "fortyshots verify found differences (listed above)." "./lab update && ./lab verify"
+  ok "results/results.json matches a fresh recomputation."
+}
+
+cmd_status() {
+  local p last
+  step "fortyshots lab status"
+  if pid_alive "$STATE/server.pid"; then
+    local h; h="$(health)"
+    case "$h" in 200) h="ready" ;; 503) h="loading" ;; *) h="not answering ($h)" ;; esac
+    ok "Model server: $h, profile $(server_running_profile), pid $(cat "$STATE/server.pid"), $BASE_URL"
+  else
+    info "Model server: not running   (start: ./lab model)"
+  fi
+  info "Default profile: $(active_profile)"
+  if pid_alive "$STATE/serve.pid"; then ok "Live console: $(live_url)"; else info "Live console: not running"; fi
+  if [ -f "$STATE/recording" ] && kill -0 "$(awk '{print $2}' "$STATE/recording")" 2>/dev/null; then
+    ok "Recording: plan $(awk '{print $1}' "$STATE/recording") is running"
+  fi
+  if pid_alive "$STATE/caffeinate.pid"; then info "Keep-awake: on"; fi
+  last="$(H runs "$REPO/runs" 0 2>/dev/null | tail -n 1)"
+  if [ -n "$last" ]; then
+    printf '%s\n' "$last" | awk -F'\t' '{ if ($2 == "yes") printf "        Last run: %s, %s/%s hits/lookups, %s min, finished %d min ago\n", $1, $3, $4, $5, $6;
+                                          else printf "        Last run: %s, not finished, last written %d min ago\n", $1, $6 }'
+  else
+    info "Last run: none yet"
+  fi
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    p="$(git status --porcelain --untracked-files=all -- runs doctor 2>/dev/null | wc -l | tr -d ' ')"
+    info "Files in runs/ and doctor/ changed since main: $p   (all of them go to runs-mac on push)"
+    info "Last push: $(cat "$STATE/last_push" 2>/dev/null || echo never)"
+    local behind; behind="$(git rev-list --count HEAD..origin/main 2>/dev/null || echo '?')"
+    info "Code: $(git rev-parse --abbrev-ref HEAD) at $(git rev-parse --short HEAD); behind GitHub main by $behind (as of the last fetch)"
+  fi
+  info "Network: $(net_state); swap used: $(swap_used_mb) MB; memory free: $(mem_free_pct)%"
+  is_mac && ! mock && info "GPU memory limit: $(wired_limit_mb) MB (needs 20480; resets on restart)"
+  return 0
+}
+
+cmd_setup() {
+  local dry=0 a missing b
+  for a in "$@"; do case "$a" in --dry-run) dry=1 ;; --yes|-y) LAB_YES=1 ;; esac; done
+  step "1/7 This computer"
+  check_platform
+  info "$(machine_chip), $(machine_ram_gb) GB RAM, $(machine_os)"
+  if ! mock && [ "$(machine_ram_gb)" -lt 24 ]; then warn "Less than 24 GB of memory: use ./lab model small."; fi
+
+  step "2/7 Tools (Homebrew: llama.cpp, uv, ffmpeg, gh)"
+  if mock; then
+    dim "LAB_MOCK=1: not checking Homebrew"
+  else
+    if ! have brew; then
+      [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
+    # shellcheck disable=SC2016  # printed for the user to paste, not expanded here
+    have brew || die "Homebrew is not installed (it is free and needs no account)." \
+      '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+    missing=""
+    for pair in llama-server:llama.cpp uv:uv ffmpeg:ffmpeg gh:gh git:git; do
+      have "${pair%%:*}" || missing="$missing ${pair#*:}"
+    done
+    if [ -n "$missing" ]; then
+      if [ "$dry" = 1 ]; then warn "Missing:$missing (would run: brew install$missing)"
+      elif confirm "Install with Homebrew: brew install$missing"; then
+        # shellcheck disable=SC2086
+        brew install $missing || die "brew install failed." "brew install$missing"
+      else
+        die "Missing tools:$missing" "brew install$missing"
+      fi
+    fi
+    if have llama-server; then
+      b="$(llama_build)"
+      if [ -n "$b" ] && [ "$b" -lt "$MIN_LLAMA_BUILD" ]; then
+        die "llama.cpp build $b is too old for Muse Glimmer (needs $MIN_LLAMA_BUILD+)." "brew upgrade llama.cpp"
+      fi
+      ok "llama.cpp build ${b:-unknown} (needs $MIN_LLAMA_BUILD or newer)"
+    fi
+    have uv && ok "uv $(uv --version 2>/dev/null | awk '{print $2}')"
+    have ffmpeg && ok "ffmpeg"
+    have gh && ok "gh $(gh --version 2>/dev/null | awk 'NR == 1 {print $3}')"
+  fi
+
+  step "3/7 Python environment for the fortyshots package"
+  if [ -n "${LAB_VENV:-}" ]; then
+    dim "Using LAB_VENV=$LAB_VENV"
+  elif [ "$dry" = 1 ]; then
+    info "Would run: uv sync"
+  else
+    need_cmd uv
+    (cd "$REPO" && uv sync) || die "uv sync failed (details above)." "cd $REPO && uv sync"
+  fi
+  if [ -x "$FS" ] && "$FS" --help >/dev/null 2>&1; then ok "fortyshots command works ($FS)"
+  elif [ "$dry" = 1 ]; then warn "fortyshots is not installed yet (./lab setup installs it)"
+  else die "The fortyshots command does not run." "cd $REPO && uv sync && ./lab setup"; fi
+
+  step "4/7 GitHub"
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    ok "Repository: $(origin_url) on branch $(git rev-parse --abbrev-ref HEAD)"
+  else
+    warn "This folder is not a git checkout; ./lab push will not work. Clone it: gh repo clone <you>/fortyshots ~/fortyshots"
+  fi
+  if mock; then
+    dim "LAB_MOCK=1: not checking the GitHub login"
+  elif gh auth status >/dev/null 2>&1; then
+    ok "GitHub login: $(gh api user --jq .login 2>/dev/null)"
+    [ "$dry" = 1 ] || gh auth setup-git >/dev/null 2>&1
+  elif [ "$dry" = 1 ]; then
+    warn "Not logged in to GitHub (gh auth login)."
+  elif confirm "Log in to GitHub now? (gh auth login opens the browser; use your existing account)"; then
+    gh auth login -h github.com -p https -w || die "GitHub login failed." "gh auth login -h github.com -p https -w"
+    gh auth setup-git >/dev/null 2>&1
+  else
+    die "Not logged in to GitHub, so results cannot be pushed." "gh auth login -h github.com -p https -w"
+  fi
+
+  step "5/7 GPU memory limit"
+  if [ "$dry" = 1 ]; then ensure_wired check-only; else ensure_wired; fi
+
+  step "6/7 Model files in $GLIMMER_DIR"
+  if mock; then
+    dim "LAB_MOCK=1: the fake model needs no files"
+  else
+    local name size sha url sz bad="" prof
+    for prof in default live; do
+      while IFS="$(printf '\t')" read -r name size sha url; do
+        sz="$(file_size "$GLIMMER_DIR/$name")"
+        if [ "$sz" != "$size" ]; then
+          if [ "$prof" = default ]; then bad="$bad $name"; warn "$name: missing or incomplete"
+          else info "$name: not downloaded (needed for ./lab live: ./lab download live)"; fi
+        elif [ "$dry" = 1 ]; then ok "$name present (sha256 not checked in a dry run)"
+        elif verify_file "$GLIMMER_DIR/$name" "$size" "$sha"; then ok "$name (sha256 ok)"
+        else bad="$bad $name"; warn "$name: sha256 does not match Hugging Face"; fi
+      done <<EOF
+$(H files "$PROFILES" "$prof")
+EOF
+    done
+    [ -z "$bad" ] || [ "$dry" = 1 ] || die "Model files need attention:$bad" "./lab download default"
+  fi
+
+  step "7/7 Power and updates"
+  power_checks
+  info "Turn off automatic macOS updates until Nov 4 so the Mac does not restart overnight:"
+  info "System Settings > General > Software Update > Automatic updates (i) > turn off 'Install macOS updates'."
+  step "Setup complete"
+  info "Next: ./lab doctor"
+  return 0
+}
+
+usage() {
+  cat <<EOF
+fortyshots lab $LAB_VERSION: run Muse Glimmer 30B on this Mac and record campaigns.
+
+First time (in this order):
+  ./lab download [profile...]   download model files to $GLIMMER_DIR (resumable, sha256-checked)
+  ./lab smoke [profile]         start llama-server, one chat call, print tok/s, swap and GPU memory
+  ./lab setup [--dry-run]       check the Mac, install tools, Python env, GitHub login, model files
+  ./lab doctor [profile]        full model check; writes doctor/<time>.json and pushes it
+  ./lab doctor --rehearse       one live round with browser + screen recording open; warns on swap
+
+Recording:
+  ./lab pilot                   3 dev campaigns on P0 (same as: ./lab record pilot)
+  ./lab record <plan>           run mac/plans/<plan>.json (main, second, resume); pushes after each run
+  ./lab live                    model (profile live) + live console in the browser
+  ./lab live run                start one demo campaign in the live console
+
+Model:
+  ./lab model [profile]         start llama-server in the background (log: $SERVER_LOG)
+  ./lab stop                    stop the model server, the console and keep-awake
+
+Sharing and checking:
+  ./lab push                    push runs/ and doctor/ to branch runs-mac (prints pushed or NOT PUSHED)
+  ./lab push-media <files...>   upload recordings to branch media (re-encodes files over 95 MB)
+  ./lab update                  get the latest code from GitHub main
+  ./lab verify                  recompute every published number, no model needed
+  ./lab status                  what is running, last run, last push
+
+Profiles (mac/profiles.json):
+$(H profiles "$PROFILES" 2>/dev/null | awk -F'\t' '{printf "  %-14s %s\n", $1, $2}')
+EOF
+}
+
+main() {
+  cd "$REPO" || exit 1
+  mkdir -p "$STATE" 2>/dev/null
+  need_py
+  CMD="${1:-help}"
+  [ $# -gt 0 ] && shift
+  case "$CMD" in
+    setup) cmd_setup "$@" ;;
+    download) cmd_download "$@" ;;
+    smoke) cmd_smoke "$@" ;;
+    model) cmd_model "$@" ;;
+    stop) cmd_stop ;;
+    doctor) cmd_doctor "$@" ;;
+    pilot) cmd_record pilot ;;
+    record) cmd_record "$@" ;;
+    live) cmd_live "$@" ;;
+    push) cmd_push ;;
+    push-media) cmd_push_media "$@" ;;
+    update) cmd_update ;;
+    verify) cmd_verify ;;
+    status) cmd_status ;;
+    help|-h|--help) usage ;;
+    *) die "Unknown command: $CMD" "./lab help" ;;
+  esac
+}
+
+main "$@"
+exit $?

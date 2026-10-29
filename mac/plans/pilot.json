@@ -1,0 +1,21 @@
+{
+  "name": "pilot",
+  "description": "Oct 30 night. Three A5 campaigns on the dev pool P0. Used to tune prompts and to measure minutes per campaign (sets k in PREREG). Never part of the benchmark.",
+  "runs": [
+    {
+      "arm": "A5",
+      "pool": "P0",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P0",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P0",
+      "seed": 2
+    }
+  ]
+}

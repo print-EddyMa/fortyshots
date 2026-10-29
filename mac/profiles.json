@@ -1,0 +1,111 @@
+{
+  "about": "Model profiles for ./lab. Sizes and sha256 come from the Hugging Face API (lfs metadata) on Oct 29, 2026. est_total_gb = weights + vision + drafter + KV cache + compute buffers, estimated, not measured. headroom_gb = 24 - est_total_gb. A drafter (DFlash) is only allowed on a profile with headroom_gb >= 3, so never on Q4_K_M + mmproj.",
+  "ram_gb": 24,
+  "wired_limit_mb": 20480,
+  "port": 8080,
+  "common_flags": [
+    "-a", "muse-glimmer-30b",
+    "-ngl", "99",
+    "-np", "1",
+    "--jinja",
+    "--temp", "1.0",
+    "--top-p", "0.95",
+    "--top-k", "64",
+    "--reasoning-budget", "1024",
+    "--cache-ram", "1024",
+    "--ctx-checkpoints", "8",
+    "--image-max-tokens", "1024",
+    "--metrics",
+    "--host", "127.0.0.1"
+  ],
+  "files": {
+    "q4km": {
+      "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+      "file": "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+      "size": 16756683904,
+      "sha256": "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e"
+    },
+    "mmproj": {
+      "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+      "file": "mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+      "size": 1400328928,
+      "sha256": "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6"
+    },
+    "dflash": {
+      "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+      "file": "dflash-Muse-Glimmer-30B-Q4_K_M.gguf",
+      "size": 1631208128,
+      "sha256": "b2e808bf656086fe86bd0d0bd990f01d33e377537a07c02d45371517c8b264ef"
+    },
+    "ud_q4kxl": {
+      "repo": "unsloth/Muse-Glimmer-30B-GGUF",
+      "file": "Muse-Glimmer-30B-UD-Q4_K_XL.gguf",
+      "size": 15878222368,
+      "sha256": "82bece304887a313ece08400bc030f6066c7bff5b906b0cd40308ec8a409fd38"
+    },
+    "ud_q3kxl": {
+      "repo": "unsloth/Muse-Glimmer-30B-GGUF",
+      "file": "Muse-Glimmer-30B-UD-Q3_K_XL.gguf",
+      "size": 13360983072,
+      "sha256": "820d18e00c59376331eba62dd716a6bcdcaa305c2316f5da3a2fab36c7c37e15"
+    }
+  },
+  "profiles": {
+    "default": {
+      "description": "Meta Q4_K_M + vision, 32K context. Used for recorded campaigns.",
+      "model": "q4km",
+      "mmproj": "mmproj",
+      "draft": null,
+      "ctx": 32768,
+      "quant": "Q4_K_M",
+      "est_total_gb": 19.5,
+      "headroom_gb": 4.5,
+      "fallback": "live"
+    },
+    "live": {
+      "description": "unsloth UD-Q4_K_XL + vision, 16K context. Smaller, for the live demo with a browser and screen recording open.",
+      "model": "ud_q4kxl",
+      "mmproj": "mmproj",
+      "draft": null,
+      "ctx": 16384,
+      "quant": "UD-Q4_K_XL",
+      "est_total_gb": 18.2,
+      "headroom_gb": 5.8,
+      "fallback": "small"
+    },
+    "small": {
+      "description": "unsloth UD-Q3_K_XL + vision, 32K context. Last fallback if the others swap.",
+      "model": "ud_q3kxl",
+      "mmproj": "mmproj",
+      "draft": null,
+      "ctx": 32768,
+      "quant": "UD-Q3_K_XL",
+      "est_total_gb": 15.9,
+      "headroom_gb": 8.1,
+      "fallback": null
+    },
+    "live-dflash": {
+      "description": "live + Meta DFlash drafter. Only for the DFlash speed A/B against live.",
+      "model": "ud_q4kxl",
+      "mmproj": "mmproj",
+      "draft": "dflash",
+      "ctx": 16384,
+      "quant": "UD-Q4_K_XL",
+      "est_total_gb": 19.8,
+      "headroom_gb": 4.2,
+      "fallback": "live"
+    },
+    "small-dflash": {
+      "description": "small + Meta DFlash drafter. Only for the DFlash speed A/B against small.",
+      "model": "ud_q3kxl",
+      "mmproj": "mmproj",
+      "draft": "dflash",
+      "ctx": 32768,
+      "quant": "UD-Q3_K_XL",
+      "est_total_gb": 17.5,
+      "headroom_gb": 6.5,
+      "fallback": "small"
+    }
+  },
+  "draft_flags": ["-ngld", "99"]
+}

@@ -77,7 +77,11 @@ def _campaign(cfg, run_id: str | None, resume: bool):
     if run_id is None:
         from .campaign import new_run_id
         run_id = new_run_id(cfg)
-        if (cfg.runs_dir / run_id).exists():
+        stale = cfg.runs_dir / run_id
+        if stale.exists() and not (stale / "events.jsonl").exists():
+            import shutil
+            shutil.rmtree(stale)  # a start that failed before its first event left nothing to resume
+        if stale.exists():
             raise SystemExit(f"{cfg.runs_dir / run_id} already exists; pass --resume or --run-id")
     return Campaign(cfg, run_id=run_id, transport=_transport(cfg))
 

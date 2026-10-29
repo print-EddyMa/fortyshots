@@ -81,7 +81,7 @@ class Doctor:
             ok, detail = False, {"error": f"{type(e).__name__}: {e}"[:500]}
         self.checks.append({"name": name, "ok": bool(ok), "required": required, "detail": detail,
                             "dur_ms": int((time.monotonic() - t0) * 1000)})
-        print(f"  {'ok  ' if ok else 'FAIL'} {name}", flush=True)
+        print(f"  {'ok  ' if ok else 'FAIL' if required else 'warn'} {name}", flush=True)
         return ok, detail
 
     def count_tokens(self, text: str) -> int:
@@ -251,9 +251,9 @@ class Doctor:
                      + secs("critic", False, 1) + secs("proposer", True, 0.5))
         total = 4 * per_round + secs("reporter", False, 1)
         minutes = round(total / 60, 1)
-        k = 5 if minutes <= 15 else 3 if minutes <= 25 else 2
+        k = 3 if minutes <= 15 else 2 if minutes <= 25 else 1
         return {"campaign_minutes": minutes, "per_round_minutes": round(per_round / 60, 1), "seeds_per_pool_k": k,
-                "rule": "<=15 min: k=5; <=25 min: k=3; else k=2 (PREREG)"}
+                "rule": "A5 seeds per test pool: <=15 min k=3; <=25 min k=2; else k=1 (PREREG section 7)"}
 
 
 def run_doctor(base_url: str, out: Path, data_dir: Path, pool: str = "P0", hash_gguf: str | None = None,

@@ -1,1 +1,142 @@
 # fortyshots
+
+An offline AI lab that decides which expensive experiment to run next, and shows its work.
+
+- **What it does.** Meta's open-weights **Muse Glimmer 30B** runs on a 24 GB MacBook and plays four roles (director, proposer, critic, reporter) in an agent that has 40 hidden-DFT lookups to find metal-organic frameworks (MOFs) that bind CO2 more strongly than water, out of a pool of 500.
+- **How it is scored.** The "experiments" are Meta FAIR's ODAC23 DFT labels, sealed until the agent pays for them. Every campaign is pre-registered ([PREREG.md](PREREG.md)) and compared with random choice and a random-forest active learner, with bootstrap confidence intervals.
+- **How it runs.** Fully local: llama.cpp `llama-server` on the Mac, no API key, no account, no cloud inference. `git clone` and `./lab verify` recompute every published number without a model.
+
+Site: https://{{GITHUB_USER}}.github.io/fortyshots/ · Video: {{VIDEO_URL}} · Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon.
+
+---
+
+## Results
+
+Status: **{{RESULTS_STATUS}}** (filled from `results/results.json`; `./lab verify` recomputes it). Pre-registration: tag `prereg-v1`, sha256 `{{PREREG_SHA}}`.
+
+Headline (the rule in PREREG §9 decides its wording; it always names both baselines):
+> {{HEADLINE}}
+
+| Arm | What it is | Runs | Hits in 40 (mean, 95% CI) | Enrichment | Lookups per hit |
+|---|---|---|---|---|---|
+| A0 | Random | {{A0_N}} | {{A0_HITS}} [{{A0_LO}}, {{A0_HI}}] | {{A0_ENR}} | {{A0_LPH}} |
+| A1 | Pore and open-metal-site heuristic | {{A1_N}} | {{A1_HITS}} [{{A1_LO}}, {{A1_HI}}] | {{A1_ENR}} | {{A1_LPH}} |
+| A2 | Greedy on the cheap simulator (MACE) | {{A2_N}} | {{A2_HITS}} [{{A2_LO}}, {{A2_HI}}] | {{A2_ENR}} | {{A2_LPH}} |
+| A3 | Random-forest active learner (RF-UCB) | {{A3_N}} | {{A3_HITS}} [{{A3_LO}}, {{A3_HI}}] | {{A3_ENR}} | {{A3_LPH}} |
+| A4 | Glimmer, zero-shot (orders 40 at once) | {{A4_N}} | {{A4_HITS}} [{{A4_LO}}, {{A4_HI}}] | {{A4_ENR}} | {{A4_LPH}} |
+| **A5** | **Glimmer agent, 4 rounds of 10** | {{A5_N}} | {{A5_HITS}} [{{A5_LO}}, {{A5_HI}}] | {{A5_ENR}} | {{A5_LPH}} |
+| A6 | A5 without the random-forest tool | {{A6_N}} | {{A6_HITS}} [{{A6_LO}}, {{A6_HI}}] | {{A6_ENR}} | {{A6_LPH}} |
+
+- Primary test, A5 vs A3 (pool-stratified permutation, one-sided): difference {{A5_A3_DIFF}}, p = {{A5_A3_P}}.
+- Ceilings at 40 lookups: a perfect oracle finds {{ORACLE_HITS}} per pool on average; random expects {{RANDOM_HITS}} (40 × hits ÷ 500).
+- Calibration of the agent's P(hit): Brier {{BRIER}} over {{BRIER_N}} picks. Critic's visual reading of its own parity plot vs the computed Spearman: mean absolute error {{VISUAL_RHO_MAE}}.
+- Claim checker: {{CLAIMS_VERIFIED}} of {{CLAIMS_N}} numeric claims in agent reports verified, {{CLAIMS_FLAGGED}} flagged.
+- Leak probe (Glimmer ranks raw CSD refcodes with nothing else): AUC {{LEAK_AUC}}.
+- Physics honesty panel (never shown to the agent): MACE hit AUC {{MACE_AUC}} [{{MACE_AUC_LO}}, {{MACE_AUC_HI}}]; DFT at the starting geometry {{DFT_INIT_AUC}}.
+
+With {{A5_N}} agent runs the intervals are wide, and we say so. Every number above links to its computation on the [results page](https://{{GITHUB_USER}}.github.io/fortyshots/#/results).
+
+## How it works
+
+```
+Mac (M4 Pro, 24 GB, Wi-Fi optional)
+  llama-server 127.0.0.1:8080  <-  Muse Glimmer 30B GGUF + vision projector, --jinja
+  fortyshots agent             ->  tools over committed caches: query_pool, get_descriptors, cheap_score,
+                                   fit_surrogate, calibrate_oracle, render_structure, request_dft (40 max)
+  runs/<id>/events.jsonl       ->  append-only ledger; replayed by the static site
+```
+
+Each campaign has 4 rounds. In each round the director explores the pool with tools, the proposer commits to 10 picks with a probability of being a hit, the critic looks at a rendered parity plot and a binding-site image and may veto up to 3 picks, and then the agent buys the 10 DFT results. From round 2 the agent must call `calibrate_oracle`, which compares the cheap simulator with the labels it has bought so far. It is not told how good the simulator is; what it does with the answer is its own decision. After round 4 the reporter writes a report with citations, and a deterministic claim checker verifies every number in it against the ledger.
+
+### Where Muse Glimmer is used
+
+| Role | Glimmer feature | What it produces | Fallback if it fails |
+|---|---|---|---|
+| Director | Native tool calls (parallel), `reasoning_strength: medium` | Tool calls that explore the pool and fit the surrogate | json_schema action mode, dispatched by our code |
+| Proposer | json_schema output (grammar-enforced) | 10 picks with P(hit), rationale and cited evidence | Validate and retry twice, then the director's ranking (logged) |
+| Critic | Vision through the `mmproj` projector | `visual_rho` (a numeric reading of the parity plot) and up to 3 vetoes | Text parity table (logged) |
+| Reporter | Prose with `[call_id]` citations, `reasoning_strength: low` | Campaign report; text written by the model is labelled "written by Muse Glimmer 30B" | Template report from the ledger |
+| Chemist (optional) | json_schema | Mutation specs for new candidates, marked "unvalidated · ML only" | Skipped |
+
+One model file serves every role. Reasoning cannot be switched off in Glimmer; it arrives in `reasoning_content`, is capped with `--reasoning-budget`, and is shown collapsed in the console.
+
+### Other Meta assets
+
+- **ODAC23** (Meta FAIR, CC-BY-4.0): the hidden DFT labels and the DFT-relaxed CO2 poses shown in the 3D viewer.
+- **EquiformerV2 ODAC checkpoint** (Meta FAIR): a cross-check for prospective mutants only. It was trained on ODAC23, so it is never a benchmark arm. It is downloaded at run time and never committed.
+
+## Hardware and quantization
+
+| | Value |
+|---|---|
+| Machine | MacBook Pro, Apple M4 Pro, 24 GB unified memory, {{MACOS_VERSION}} |
+| Model file | `Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf` (Meta, 16.76 GB) + `mmproj-Muse-Glimmer-30B-Q4_K_M.gguf` (1.40 GB) |
+| sha256 (published by Hugging Face, checked by `./lab download` and recorded in every run header) | `4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e` |
+| llama.cpp | build {{LLAMA_BUILD}} (Homebrew), flags in [mac/profiles.json](mac/profiles.json) |
+| Context | 32,768 tokens, 1 slot |
+| GPU memory limit | `sudo sysctl iogpu.wired_limit_mb=20480` (resets on reboot) |
+| Decode speed | {{TOKS}} tok/s (median over agent calls) |
+| Prompt speed | {{PREFILL_TOKS}} tok/s |
+| Memory while recording | {{MEM_GB}} GB used, swap growth {{SWAP_GB}} GB |
+| Minutes per A5 campaign | {{CAMPAIGN_MIN}} (median) |
+| DFlash drafter A/B | {{DFLASH_RESULT}} |
+| Live-demo profile | unsloth `UD-Q4_K_XL` (15.88 GB) + the same vision file, 16K context |
+
+The memory figures before measurement were estimates: weights plus vision about 18.2 GB, about 19.5 GB with the KV cache. The DFlash drafter is only tried on profiles with at least 3 GB of headroom, so never together with Q4_K_M and the vision file.
+
+## What changed since the application
+
+We pitched a Llama agent driving Meta's UMA potential. UMA, ODAC25 and the Muse API need gated access or signups, and we committed to zero signups. So fortyshots runs on Meta's open-weights Muse Glimmer 30B and on Meta FAIR's openly downloadable ODAC23 data and EquiformerV2 checkpoint. We also measured, before building, that machine-learned potentials miss chemisorption at ODAC's starting geometries: MACE-MP-0 single points give a hit AUC of 0.49 [0.40–0.58] on 200 training MOFs (`research/out/fast_strat_mace.jsonl`), no better than chance. So the agent treats physics as noisy evidence and spends a DFT budget to decide, instead of trusting a simulator.
+
+## Built during the hackathon
+
+The repository's first commit is tagged `hackathon-start` (Oct 29, 2026); there is no earlier history. `git log --date=short --format='%h %ad %s' -- <path>` lists the commits for any row.
+
+| Component | Path | Built here | Commit range |
+|---|---|---|---|
+| ODAC23 extraction, hashed IDs, pools, labels | `physics/`, `data/` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| Research measurements behind the design (MACE, eqV2, Orb on ODAC configs) | `research/` | yes, Oct 29 | `hackathon-start` |
+| MACE cheap-oracle cache | `physics/`, `data/mace_cache.parquet` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| Agent: roles, tools, ledger, cassettes, claim checker, mock server, live server | `fortyshots/` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| Baselines, statistics, `verify` | `bench/` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| Web console, results, gallery | `web/` → `docs/` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| Mac runtime | `lab`, `mac/` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| Recorded campaigns | `runs/` | yes, recorded Oct 30 – Nov 2 on the Mac | {{RUNS_RANGE}} |
+| Muse Glimmer weights, llama.cpp, ODAC23, MACE-MP-0, EquiformerV2, CoRE MOF, fonts and JS libraries | — | no, reused; see [PRIOR_WORK.md](PRIOR_WORK.md) | — |
+
+## Reproduce
+
+**Every published number, no model, any OS** (about a minute):
+```bash
+git clone https://github.com/{{GITHUB_USER}}/fortyshots && cd fortyshots
+uv sync
+./lab verify
+```
+`./lab verify` runs `fortyshots verify`, which recomputes `results/results.json` from `runs/` and `data/` and prints any difference.
+
+**Replay a campaign:** open the site, or `uv run fortyshots serve` and visit http://127.0.0.1:7777.
+
+**Record new campaigns on an Apple-silicon Mac with 24 GB or more** (about 18 GB of downloads, no login):
+```bash
+./lab download default
+./lab setup
+./lab doctor
+./lab record main
+```
+[MAC_SETUP.md](MAC_SETUP.md) has every step. Results go to `runs/` and, if you have push access, to the branch `runs-mac`.
+
+## Limitations
+
+- **Retrospective labels.** The "experiments" are existing ODAC23 DFT reference labels (PBE+D3, minimum over ODAC's placements), not new calculations or lab measurements. They are not global minima, and the empty-framework references were later revised in ODAC25.
+- **Known MOFs, not new discoveries.** Every candidate is an existing, published framework. A hit means the agent picked a framework whose label was already a hit; it does not mean a new sorbent was found.
+- **Humid air is a proxy.** "Binds CO2 more strongly than water" compares single-molecule binding energies. It says nothing about co-adsorption, kinetics, stability in water or cost at scale.
+- **Prospective mutants are unvalidated.** Agent-proposed variants are relaxed with ML potentials only, ranked by the surrogate, labelled "unvalidated · ML only", and never counted in any result.
+- **Small samples.** {{A5_N}} agent runs over 5 pools give wide intervals. The designers knew the aggregate MACE AUC before the freeze (disclosed in PREREG §10).
+- **Muse Glimmer failure modes** (disclosed per its Usage Policy, §4). The model can state numbers that no tool produced; the claim checker flags these and the count is published ({{CLAIMS_FLAGGED}} flagged). It can return malformed or empty output, especially when reasoning uses up the token budget; these are logged as errors and retried ({{SCHEMA_FAILURES}} schema failures). Its reading of plots can be wrong; we publish its error ({{VISUAL_RHO_MAE}}). It may recall published results; the leak probe measures this ({{LEAK_AUC}}). Quantization to 4 bits may change answers slightly compared with full precision. It is a planning aid for a researcher, not a replacement for one: recorded runs approve batches automatically and say so, and live runs ask a human.
+
+## Licenses
+
+- Our code: Apache-2.0 ([LICENSE](LICENSE)).
+- Data and models we use, and what we changed: [DATA_LICENSES.md](DATA_LICENSES.md). Muse Glimmer weights are never redistributed here; they download from Hugging Face under Apache-2.0 and Meta's [Usage Policy](https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/blob/main/USAGE_POLICY.md).
+- Libraries, fonts and tools: [THIRD_PARTY.md](THIRD_PARTY.md).
+- Prior work and what we reused: [PRIOR_WORK.md](PRIOR_WORK.md). Changes after the pre-registration: [DEVIATIONS.md](DEVIATIONS.md). History: [CHANGELOG.md](CHANGELOG.md).

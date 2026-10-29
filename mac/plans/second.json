@@ -1,0 +1,56 @@
+{
+  "name": "second",
+  "description": "Nov 1 night. A6 (agent without fit_surrogate) on P1-P5 seed 0, then A5 seed 1 on P1-P5.",
+  "runs": [
+    {
+      "arm": "A6",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P2",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P3",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P4",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P5",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P1",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P2",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P3",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P4",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P5",
+      "seed": 1
+    }
+  ]
+}

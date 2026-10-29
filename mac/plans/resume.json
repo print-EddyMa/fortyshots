@@ -1,0 +1,166 @@
+{
+  "name": "resume",
+  "description": "Nov 2 night (buffer). First every run from main and second again: finished runs are skipped, unfinished ones resume. Then extra seeds while time allows: A5 seed 2 and A6 seed 1 on P1-P5. The lead may resize this after doctor sets k.",
+  "runs": [
+    {
+      "arm": "A5",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P2",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P3",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P4",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P5",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P2",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P3",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P4",
+      "seed": 0
+    },
+    {
+      "arm": "A4",
+      "pool": "P5",
+      "seed": 0
+    },
+    {
+      "arm": "L",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "L2",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P1",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P2",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P3",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P4",
+      "seed": 0
+    },
+    {
+      "arm": "A6",
+      "pool": "P5",
+      "seed": 0
+    },
+    {
+      "arm": "A5",
+      "pool": "P1",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P2",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P3",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P4",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P5",
+      "seed": 1
+    },
+    {
+      "arm": "A5",
+      "pool": "P1",
+      "seed": 2
+    },
+    {
+      "arm": "A5",
+      "pool": "P2",
+      "seed": 2
+    },
+    {
+      "arm": "A5",
+      "pool": "P3",
+      "seed": 2
+    },
+    {
+      "arm": "A5",
+      "pool": "P4",
+      "seed": 2
+    },
+    {
+      "arm": "A5",
+      "pool": "P5",
+      "seed": 2
+    },
+    {
+      "arm": "A6",
+      "pool": "P1",
+      "seed": 1
+    },
+    {
+      "arm": "A6",
+      "pool": "P2",
+      "seed": 1
+    },
+    {
+      "arm": "A6",
+      "pool": "P3",
+      "seed": 1
+    },
+    {
+      "arm": "A6",
+      "pool": "P4",
+      "seed": 1
+    },
+    {
+      "arm": "A6",
+      "pool": "P5",
+      "seed": 1
+    }
+  ]
+}
