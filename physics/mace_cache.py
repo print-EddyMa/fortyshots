@@ -13,15 +13,14 @@ import time
 import warnings
 
 warnings.filterwarnings("ignore")
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import torch  # noqa: E402
-from ase.build import molecule  # noqa: E402
-from ase.io import iread  # noqa: E402
-from ase.optimize import BFGS  # noqa: E402
+import pandas as pd
+import torch
+from ase.build import molecule
+from ase.io import iread
+from ase.optimize import BFGS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_data import hid  # noqa: E402
+from build_data import hid
 
 MAX_PLACEMENTS = 5
 PRIORITY = ["P1", "P2", "P3", "P4", "P5", "P0", "V"]
@@ -39,10 +38,11 @@ def main():
     path = f"{out}/shard-{k}.jsonl"
     done = set()
     if os.path.exists(path):
-        for line in open(path):
-            r = json.loads(line)
-            if r.get("kind") == "done":
-                done.add(r["id"])
+        with open(path) as fh:
+            for line in fh:
+                r = json.loads(line)
+                if r.get("kind") == "done":
+                    done.add(r["id"])
 
     configs = {}
     for a in iread(src, index=":"):
