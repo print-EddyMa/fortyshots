@@ -43,6 +43,15 @@ def unwrap(pos, pos_relaxed, cell):
     return pos_relaxed - np.round(d) @ cell
 
 
+def make_whole(pos, idx, cell):
+    """Move the atoms in idx to the periodic images nearest the first of them (CO2 split across the cell)."""
+    pos = pos.copy()
+    if len(idx):
+        d = (pos[idx] - pos[idx[0]]) @ np.linalg.inv(cell)
+        pos[idx] -= np.round(d) @ cell
+    return pos
+
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
     rows, best = [], {}
@@ -89,10 +98,11 @@ def main():
             continue
         _, a = best[(r.split, r.mof)]
         cell = np.array(a.cell)
-        pos = a.positions
+        ads = np.flatnonzero(a.get_tags() > 0)
+        pos = make_whole(a.positions, ads, cell)
         rel = unwrap(pos, a.arrays["pos_relaxed"], cell)
         doc = {"id": r.id, "cell": np.round(cell, 4).tolist(), "numbers": a.numbers.tolist(),
-               "ads": np.flatnonzero(a.get_tags() > 0).tolist(),
+               "ads": ads.tolist(),
                "pos": np.round(pos, 3).tolist(), "pos_relaxed": np.round(rel, 3).tolist()}
         with open(f"{out}/structures/{r.id}.json", "w") as fh:
             json.dump(doc, fh, separators=(",", ":"))

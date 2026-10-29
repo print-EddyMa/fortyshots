@@ -143,3 +143,9 @@ IDs look like `m` plus 7 hex characters, for example `m3fa9c2e`. They are salted
 - **Leak AUC.** Compute it from `summary.leak` or `summary.ranking`, not from `picks`.
 - **`runs/index.json` entries.** Optional fields `showcase: bool` and `goal: str`. The showcase run is the median A5 run on P1, chosen by the PREREG rule; if no run is marked, the web falls back to the first A5 run on P1.
 - **`results/pools.json` rows.** Optional field `metal_density` (`n_metal_atoms / volume_A3 × 1000`). Rows may use either `cost_tier` or `metal_cost_tier`.
+- **`mace_cache.parquet` placement names.** Names carry no refcode prefix (for example `CO2_random_2`).
+- **`co2_best_ads_pos`.** Carbon first, with the molecule made whole across periodic boundaries.
+- **`structures/<id>.json`.** The adsorbate is also made whole in `pos`, and `pos_relaxed` is unwrapped against it.
+- **L and L2 summaries.** Also carry `scores` (id → model score), so `verify` can recompute `leak.auc`.
+- **`results.json` `tests[]` entries.** May carry an optional `ci_note`.
+- **`fit_surrogate`.** Uses the same code as arm A3 (`bench/surrogate.py`).

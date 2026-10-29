@@ -6,8 +6,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import roc_auc_score
+
+from bench import surrogate
 
 from . import render
 from .config import BUDGET, dac_score
@@ -20,11 +21,8 @@ LIST_COLS = ["id", "formula", "metals", "oms", "pld_A", "lcd_A", "density_gcm3",
              "metal_cost_tier", "E_CO2_mace", "E_H2O_mace", "S_mace"]
 DESC_COLS = ["id", "formula", "metals", "n_metal_atoms", "natoms", "volume_A3", "density_gcm3", "oms", "lcd_A", "pld_A",
              "asa_m2g", "void_fraction", "metal_cost_tier"]
-FEATURES = ["n_metal_atoms", "natoms", "volume_A3", "density_gcm3", "oms", "lcd_A", "pld_A", "asa_m2g", "void_fraction",
-            "metal_cost_tier", "E_CO2_mace", "E_H2O_mace", "S_mace"]
 DECIMALS = {"pld_A": 2, "lcd_A": 2, "density_gcm3": 3, "void_fraction": 3, "asa_m2g": 0, "volume_A3": 0}
 MAX_IDS = 25
-RF_TREES = 500
 RF_SEED = 0
 
 _ids = {"type": "array", "items": {"type": "string"}, "maxItems": MAX_IDS}
@@ -227,23 +225,15 @@ class PoolEnv:
         res = _table(self.by_id.loc[ids], ["id", "E_CO2_mace", "E_H2O_mace", "S_mace"])
         return ToolOutput(True, f"cheap scores for {len(ids)} MOFs", res, ids=ids)
 
-    def _features(self) -> pd.DataFrame:
-        x = self.df[FEATURES].astype(float)
-        return x.fillna(x.median()).fillna(0.0)
-
     def fit_surrogate(self, kappa: float = 1.0, top_k: int = 10) -> ToolOutput:
         if len(self.bought) < 5:
             raise ToolError(f"needs at least 5 bought labels, have {len(self.bought)}")
         kappa = float(kappa)
         top_k = max(1, min(int(top_k), MAX_IDS))
-        x = self._features()
         train = self.df["id"].isin(self.bought).to_numpy()
-        y = np.array([self.bought[i]["S"] for i in self.df["id"][train]])
-        rf = RandomForestRegressor(n_estimators=RF_TREES, random_state=RF_SEED, n_jobs=2)
-        rf.fit(x[train].to_numpy(), y)
-        xt = x[~train].to_numpy()
-        per_tree = np.stack([t.predict(xt) for t in rf.estimators_])
-        mean, std = per_tree.mean(0), per_tree.std(0)
+        y = [self.bought[i]["S"] for i in self.df["id"][train]]
+        # the same pre-registered RF as baseline A3 (bench/surrogate.py)
+        mean, std = surrogate.fit_predict(self.df[train], y, self.df[~train], seed=RF_SEED)
         cand = self.df.loc[~train, ["id", "formula", "S_mace"]].copy()
         cand["pred_S"], cand["std"], cand["acq"] = mean, std, mean - kappa * std
         cand = cand.sort_values(["acq", "id"]).head(top_k)

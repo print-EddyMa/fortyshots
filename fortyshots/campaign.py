@@ -767,7 +767,7 @@ class Campaign:
             "mode": self.cfg.mode, "model": self.model_name, "hits": sum(flags), "spent": 0, "picks": top,
             "hit_flags": flags, "lookups_to_first_hit": next((k + 1 for k, h in enumerate(flags) if h), None),
             "brier": None, "p_hits": [scores[i] / 10 for i in top], "duration_s": round(self.elapsed(), 1),
-            "aborted": self.aborted, "autofill": 0, "ranking": ranked,
+            "aborted": self.aborted, "autofill": 0, "ranking": ranked, "scores": {i: scores[i] for i in ranked},
             "leak": {"auc": leak["auc"], "n": leak["n"], "n_hits": leak["n_hits"], "n_scored": len(scores)}}
         self.emit("summary", "system", summary)
         self.ledger.write_summary(summary)

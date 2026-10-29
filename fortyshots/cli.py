@@ -189,7 +189,11 @@ def main(argv=None):
     p = sub.add_parser("verify", help="recompute results/results.json from runs/ and data/")
     p.add_argument("rest", nargs=argparse.REMAINDER, help="passed through to bench.verify")
     p.set_defaults(fn=cmd_verify)
-    args = ap.parse_args(argv)
+    args, extra = ap.parse_known_args(argv)
+    if extra and args.cmd != "verify":
+        ap.error(f"unrecognized arguments: {' '.join(extra)}")
+    if args.cmd == "verify":
+        args.rest = [*args.rest, *extra]
     args.fn(args)
 
 
