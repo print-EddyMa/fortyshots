@@ -4,15 +4,18 @@
 
 ## 1. Question
 
-Given 40 DFT lookups in a pool of 500 MOFs, does an LLM agent (Muse Glimmer 30B, run locally) that plans, uses cheap tools and learns from the labels it buys, find more humid-air CO2 binders than a tuned random-forest active learner with the same budget and the same information?
+Given 40 DFT lookups in a pool of 500 MOFs, does an LLM agent (Muse Glimmer 30B, run locally) that plans, uses cheap tools and learns from the labels it buys, find more humid-air CO2 binders than the strongest simple baseline with the same budget and the same information?
 
 ## 2. Hypotheses
 
-- **H1 (primary).** Mean hits@40 of the full agent (A5) is greater than that of RF-UCB (A3).
+- **H1 (primary).** Mean hits@40 of the full agent (A5) is greater than that of MACE-greedy (A2), the strongest baseline on the test pools.
+- **H1b.** A5 is greater than RF-UCB (A3), the random-forest active learner.
 - **H2.** A5 is greater than random (A0).
 - **H3.** A5 is greater than the same agent without the surrogate tool (A6). This isolates what the LLM adds beyond the shared random forest.
 
-All three are one-sided. We expect H2 to hold. We have no confident expectation for H1 or H3, and both a loss and a tie will be reported.
+All are one-sided. We expect H2 to hold. We have no confident expectation for H1, H1b or H3, and both a loss and a tie will be reported.
+
+**Why A2 is the primary comparator (disclosed).** Before the freeze, with every baseline computed on P1–P5, MACE-greedy (A2) was the strongest baseline: 2.20 hits@40 against 1.39 for RF-UCB and 1.13 for random. MACE's ranking over the whole pool is no better than chance (hit AUC 0.49), but its 40 most strongly binding picks are enriched about two-fold. We compare against the strongest baseline we know of, not the one easiest to beat. The designers knew these baseline numbers before the freeze; they never saw any A5 result on a test pool.
 
 ## 3. Universe, labels, hit definition
 
@@ -58,13 +61,13 @@ All arms see the same information: label-free descriptors (`data/descriptors.par
 
 ## 6. Endpoints
 
-**Primary.** Mean hits@40, A5 minus A3. One-sided pool-stratified permutation test:
+**Primary.** Mean hits@40, A5 minus A2. One-sided pool-stratified permutation test:
 - 10,000 permutations, shuffling arm labels within each pool.
-- Statistic: the mean over pools of (A5 pool mean − A3 pool mean).
+- Statistic: the mean over pools of (A5 pool mean − A2 pool mean).
 - α = 0.05.
 
 **Secondary** (reported with CIs; no multiplicity correction; labelled exploratory):
-1. A5 − A0 and A5 − A6 hits@40, using the same test.
+1. A5 − A3, A5 − A0 and A5 − A6 hits@40, using the same test.
 2. Enrichment: for each pool, the arm's mean hits@40 in that pool ÷ (40 × that pool's base rate, hits ÷ 500); then the mean of these ratios over pools, each pool weighted equally. (This is not the pooled mean hits@40 divided by the pooled random expectation.)
 3. Lookups to first hit (41 when a run has no hit), and lookups per hit (total lookups ÷ total hits).
 4. Discovery curve: mean cumulative hits after k = 0…40 lookups, with pointwise 95% bands.

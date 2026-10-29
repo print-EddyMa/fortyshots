@@ -29,8 +29,9 @@ from bench.common import (
 )
 from bench.ingest import LEAK_ARMS, critic_pairs, load_runs
 
-TESTS = [("primary: A5 - A3 hits@40", "A5", "A3"), ("A5 - A0 hits@40", "A5", "A0"),
-         ("A5 - A6 hits@40", "A5", "A6"), ("A3 - A0 hits@40", "A3", "A0")]
+TESTS = [("primary: A5 - A2 hits@40", "A5", "A2"), ("A5 - A3 hits@40", "A5", "A3"),
+         ("A5 - A0 hits@40", "A5", "A0"), ("A5 - A6 hits@40", "A5", "A6"),
+         ("A2 - A0 hits@40", "A2", "A0"), ("A3 - A0 hits@40", "A3", "A0")]
 MIN_POOLS_FOR_POOL_RESAMPLING = 5
 RESEARCH = {
     "gas_relax": "research/out/relax_mace.jsonl",

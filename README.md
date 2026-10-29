@@ -27,7 +27,8 @@ Headline (the rule in PREREG §9 decides its wording; it always names both basel
 | **A5** | **Glimmer agent, 4 rounds of 10** | {{A5_N}} | {{A5_HITS}} [{{A5_LO}}, {{A5_HI}}] | {{A5_ENR}} | {{A5_LPH}} |
 | A6 | A5 without the random-forest tool | {{A6_N}} | {{A6_HITS}} [{{A6_LO}}, {{A6_HI}}] | {{A6_ENR}} | {{A6_LPH}} |
 
-- Primary test, A5 vs A3 (pool-stratified permutation, one-sided): difference {{A5_A3_DIFF}}, p = {{A5_A3_P}}.
+- Primary test, A5 vs A2, the strongest baseline (pool-stratified permutation, one-sided): difference {{A5_A2_DIFF}}, p = {{A5_A2_P}}.
+- A5 vs A3 (random forest): difference {{A5_A3_DIFF}}, p = {{A5_A3_P}}.
 - Ceilings at 40 lookups: a perfect oracle finds {{ORACLE_HITS}} per pool on average; random expects {{RANDOM_HITS}} (40 × hits ÷ 500).
 - Calibration of the agent's P(hit): Brier {{BRIER}} over {{BRIER_N}} picks. Critic's visual reading of its own parity plot vs the computed Spearman: mean absolute error {{VISUAL_RHO_MAE}}.
 - Claim checker: {{CLAIMS_VERIFIED}} of {{CLAIMS_N}} numeric claims in agent reports verified, {{CLAIMS_FLAGGED}} flagged.

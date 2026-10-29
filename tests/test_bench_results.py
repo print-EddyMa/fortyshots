@@ -43,7 +43,7 @@ def test_contents(root):
         assert a["hits_ci"][0] <= a["hits_mean"] + 1e-9 <= a["hits_ci"][1] + 2e-9
         assert all(lo <= hi for lo, hi in zip(a["curve_lo"], a["curve_hi"]))
     names = [t["name"] for t in res["tests"]]
-    assert names[0].startswith("primary: A5 - A3")
+    assert names[0].startswith("primary: A5 - A2")
     assert all(0 < t["p"] <= 1 for t in res["tests"])
     assert res["calibration"]["n"] == 2 * 2 * 40
     assert res["critic"] == {"visual_rho_mae": 0.075, "n": 16, "n_text": 0}

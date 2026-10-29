@@ -18,7 +18,7 @@ Post from accounts you already have. No new accounts, no paid promotion.
 
 2. One model, four roles: a director that explores 500 frameworks with tools, a proposer that commits to picks with a probability, a critic that reads its own plots through vision, and a reporter whose every number is checked against the run log. (2/6)
 
-3. The cheap simulator has almost no ranking signal for these binders (hit AUC {{MACE_AUC}}). We make the agent check it against the labels it buys; what it does with the answer is its own call. In the featured run it {{WHAT_IT_DID}}. (3/6)
+3. The cheap simulator ranks the whole pool no better than chance (hit AUC {{MACE_AUC}}), yet its 40 strongest binders hold twice the random rate of hits, which makes MACE-greedy the baseline to beat. We make the agent check it against the labels it buys; what it does with the answer is its own call. In the featured run it {{WHAT_IT_DID}}. (3/6)
 
 4. Scored blind against Meta FAIR's ODAC23 DFT, pre-registered before any test run: agent {{A5_HITS}} [{{A5_LO}}–{{A5_HI}}] vs random forest {{A3_HITS}} [{{A3_LO}}–{{A3_HI}}]. {{WIN_TIE_LOSS_SENTENCE}} Every number links to its computation. (4/6)
 

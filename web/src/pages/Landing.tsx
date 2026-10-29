@@ -99,6 +99,8 @@ export function Landing() {
   const a5 = arm('A5');
   const a0 = arm('A0');
   const a3 = arm('A3');
+  // The strongest non-LLM arm on these pools (PREREG H1 comparator), never a hand-picked one.
+  const best = R?.arms.filter((x) => x.kind === 'baseline').reduce<typeof a0>((b, x) => (!b || x.hits_mean > b.hits_mean ? x : b), undefined);
   const prelim = isPreliminary(R, index.data);
   const nA5 = a5?.n_runs;
   // Headline [H]: the A5 mean from results.json; until A5 is scored, the showcase run's own count (from the run index).
@@ -119,7 +121,7 @@ export function Landing() {
             40 experiments. {H} hit{H === '1' ? '' : 's'}.
           </span>
           <span className="second">
-            Random finds {a0 ? count(a0.hits_mean) : '—'}. A random forest finds {a3 ? count(a3.hits_mean) : '—'}.
+            Random finds {a0 ? count(a0.hits_mean) : '—'}. The best baseline finds {best ? count(best.hits_mean) : '—'}.
           </span>
         </h1>
         <div className="hero-row">
