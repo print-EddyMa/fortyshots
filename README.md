@@ -6,7 +6,7 @@ An offline AI lab that decides which expensive experiment to run next, and shows
 - **How it is scored.** The "experiments" are Meta FAIR's ODAC23 DFT labels, sealed until the agent pays for them. Every campaign is pre-registered ([PREREG.md](PREREG.md)) and compared with random choice and a random-forest active learner, with bootstrap confidence intervals.
 - **How it runs.** Fully local: llama.cpp `llama-server` on the Mac, no API key, no account, no cloud inference. `git clone` and `./lab verify` recompute every published number without a model.
 
-Site: https://{{GITHUB_USER}}.github.io/fortyshots/ · Video: {{VIDEO_URL}} · Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon.
+Site: https://print-EddyMa.github.io/fortyshots/ · Video: {{VIDEO_URL}} · Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon.
 
 ---
 
@@ -35,7 +35,7 @@ Headline (the rule in PREREG §9 decides its wording; it always names both basel
 - Leak probe (Glimmer ranks raw CSD refcodes with nothing else): AUC {{LEAK_AUC}}.
 - Physics honesty panel (never shown to the agent): MACE hit AUC {{MACE_AUC}} [{{MACE_AUC_LO}}, {{MACE_AUC_HI}}]; DFT at the starting geometry {{DFT_INIT_AUC}}.
 
-With {{A5_N}} agent runs the intervals are wide, and we say so. Every number above links to its computation on the [results page](https://{{GITHUB_USER}}.github.io/fortyshots/#/results).
+With {{A5_N}} agent runs the intervals are wide, and we say so. Every number above links to its computation on the [results page](https://print-EddyMa.github.io/fortyshots/#/results).
 
 ## How it works
 
@@ -109,7 +109,7 @@ The repository's first commit is tagged `hackathon-start` (Oct 29, 2026); there 
 
 **Every published number, no model, any OS** (about a minute):
 ```bash
-git clone https://github.com/{{GITHUB_USER}}/fortyshots && cd fortyshots
+git clone https://github.com/print-EddyMa/fortyshots && cd fortyshots
 uv sync
 ./lab verify
 ```

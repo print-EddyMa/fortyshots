@@ -4,7 +4,7 @@ This page lists everything you run on the MacBook (M4 Pro, 24 GB), day by day. E
 
 There are no signups and no API keys. The only accounts are GitHub (yours) and, at the end, the Cerebral Valley form and X.
 
-Replace `{{GITHUB_USER}}` with your GitHub user name everywhere below.
+Replace `print-EddyMa` with your GitHub user name everywhere below.
 
 ---
 
@@ -26,7 +26,7 @@ gh auth login
 
 **4. Get the code.**
 ```bash
-gh repo clone {{GITHUB_USER}}/fortyshots ~/fortyshots
+gh repo clone print-EddyMa/fortyshots ~/fortyshots
 cd ~/fortyshots
 ```
 

@@ -22,10 +22,10 @@ Push the Frontier
 fortyshots is an offline AI lab that decides which expensive experiment to run next. Meta's open-weights Muse Glimmer 30B runs on a 24 GB MacBook through llama.cpp, with no API key and no cloud. One model plays four roles: a director that explores 500 metal-organic frameworks with tools, a proposer that commits to picks with probabilities, a critic that reads its own plots through vision, and a reporter whose every number is checked against the run log. The agent gets 40 lookups of hidden DFT labels from Meta FAIR's ODAC23 to find frameworks that bind CO2 more strongly than water, which is why most sorbents fail in humid air. Its cheap physics simulator ranks the pool no better than chance overall but is enriched at the extreme, and the agent must check it against the labels it buys. Everything was pre-registered and scored blind against random choice, a random-forest active learner and the strongest baseline, greedy on the simulator: {{HEADLINE_SHORT}}. Every campaign replays in the browser, and `./lab verify` recomputes every published number without a model.
 
 **Public repository**
-https://github.com/{{GITHUB_USER}}/fortyshots
+https://github.com/print-EddyMa/fortyshots
 
 **Live site**
-https://{{GITHUB_USER}}.github.io/fortyshots/
+https://print-EddyMa.github.io/fortyshots/
 
 **Demo video** (3:00 or less; unlisted on an existing account; check that the link plays while logged out)
 {{VIDEO_URL}}
@@ -42,7 +42,7 @@ Everything in the repository was written between Oct 29 and Nov 4, 2026; the fir
 **Bonus categories**
 - Best Build on Meta Open Weight Models: the whole system is Muse Glimmer 30B on our own laptop; every run header records the GGUF sha256, llama.cpp build, server flags, machine and network state.
 - Best Agentic Use-Case: multi-round autonomous campaigns, a DFT budget enforced in code, recovery from tool errors, resume after a crash, a human approval gate in live mode, and lookups per hit as the metric.
-- Community Vote: the public runs gallery at https://{{GITHUB_USER}}.github.io/fortyshots/#/runs
+- Community Vote: the public runs gallery at https://print-EddyMa.github.io/fortyshots/#/runs
 - Most Viral on X: thread at {{X_THREAD_URL}}
 
 **Cover image**
