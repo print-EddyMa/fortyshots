@@ -35,14 +35,15 @@ def main():
     order = uni.sort_values(["prio", "id"]).id.tolist()
     mine = set(order[k::n])
     os.makedirs(out, exist_ok=True)
-    path = f"{out}/shard-{k}.jsonl"
+    path = f"{out}/shard-{k}-of-{n}.jsonl" if n != 2 else f"{out}/shard-{k}.jsonl"
     done = set()
-    if os.path.exists(path):
-        with open(path) as fh:
-            for line in fh:
-                r = json.loads(line)
-                if r.get("kind") == "done":
-                    done.add(r["id"])
+    for shard in sorted(os.listdir(out)):  # resume across any earlier sharding
+        if shard.endswith(".jsonl"):
+            with open(f"{out}/{shard}") as fh:
+                for line in fh:
+                    r = json.loads(line)
+                    if r.get("kind") == "done":
+                        done.add(r["id"])
 
     configs = {}
     for a in iread(src, index=":"):
