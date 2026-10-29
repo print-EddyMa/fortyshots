@@ -5,10 +5,8 @@ usage: python -m bench.results [--include-mock] [--status pilot|final] [--pools 
 import argparse
 import json
 import math
-import subprocess
 import sys
 import zlib
-from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -16,7 +14,19 @@ import numpy as np
 import pandas as pd
 
 from bench import stats
-from bench.common import ALL_POOLS, ARM_LABELS, BASELINE_ARMS, BUDGET, LLM_ARMS, ROOT, TEST_POOLS, dac_score, load_data
+from bench.common import (
+    ALL_POOLS,
+    ARM_LABELS,
+    BASELINE_ARMS,
+    BUDGET,
+    LLM_ARMS,
+    ROOT,
+    TEST_POOLS,
+    MaceCoverageError,
+    dac_score,
+    load_data,
+    prereg_commit,
+)
 from bench.ingest import LEAK_ARMS, critic_pairs, load_runs
 
 TESTS = [("primary: A5 - A3 hits@40", "A5", "A3"), ("A5 - A0 hits@40", "A5", "A0"),
@@ -56,15 +66,24 @@ def baseline_runs(base, pools):
     return out
 
 
-def llm_runs(runs, pools):
+def llm_runs(runs, pools, value=lambda r: r.hit_flags):
+    """{arm: {pool: [value(run) per run]}} for the LLM arms (runs with value None are skipped)."""
     out = {}
     for r in runs:
-        if r.arm in LLM_ARMS and r.pool in pools:
-            out.setdefault(r.arm, {}).setdefault(r.pool, []).append(r.hit_flags)
+        if r.arm in LLM_ARMS and r.pool in pools and value(r) is not None:
+            out.setdefault(r.arm, {}).setdefault(r.pool, []).append(value(r))
     return {a: {p: out[a][p] for p in sorted(out[a])} for a in out}
 
 
-def arm_entry(arm, kind, flags_by_pool, pool_hits, pool_n):
+def enrichment(hits_by_pool, pool_hits, pool_n):
+    """PREREG 6.2: mean over pools of (mean hits@40 in the pool) / (40 x the pool's base rate).
+    None when a pool has no hits (base rate 0, enrichment undefined)."""
+    if not hits_by_pool or any(pool_hits[p] == 0 for p in hits_by_pool):
+        return None
+    return float(np.mean([np.mean(h) / (BUDGET * pool_hits[p] / pool_n[p]) for p, h in hits_by_pool.items()]))
+
+
+def arm_entry(arm, kind, flags_by_pool, pool_hits, pool_n, harness=None):
     curves = {p: np.array([stats.curve(f) for f in fl]) for p, fl in flags_by_pool.items()}
     hits = {p: c[:, -1] for p, c in curves.items()}
     first = {p: np.array([stats.first_hit(f) for f in fl], dtype=float) for p, fl in flags_by_pool.items()}
@@ -74,17 +93,21 @@ def arm_entry(arm, kind, flags_by_pool, pool_hits, pool_n):
     lo, hi = stats.ci(boot)
     spent = sum(min(len(f), BUDGET) for fl in flags_by_pool.values() for f in fl)
     total_hits = sum(float(h.sum()) for h in hits.values())
-    random_expected = np.mean([BUDGET * pool_hits[p] / pool_n[p] for p in curves])
     mean_curve = stats.pool_mean(curves)
-    return {
+    entry = {
         "arm": arm, "label": ARM_LABELS[arm], "kind": kind,
         "n_runs": int(sum(len(fl) for fl in flags_by_pool.values())),
         "hits_mean": float(mean_curve[-1]), "hits_ci": [float(lo[-1]), float(hi[-1])],
-        "enrichment": float(mean_curve[-1] / random_expected) if random_expected else None,
+        "enrichment": enrichment(hits, pool_hits, pool_n),
         "lookups_per_hit": spent / total_hits if total_hits else None,
         "first_hit_mean": float(stats.pool_mean(first)),
         "curve": mean_curve.tolist(), "curve_lo": lo.tolist(), "curve_hi": hi.tolist(),
     }
+    if kind == "llm":
+        # Mean (pool-weighted, like every arm mean) of the per-run share of purchases chosen by code rather
+        # than the model: proposer fallbacks, live reject replacements and end-of-run autofill.
+        entry["harness_share"] = float(stats.pool_mean(harness)) if harness else None
+    return entry
 
 
 def tests_block(arm_flags):
@@ -119,10 +142,15 @@ def calibration_block(runs, pools):
 
 
 def critic_block(runs, pools):
-    pairs = [pr for r in runs if r.arm in LLM_ARMS and r.pool in pools for pr in critic_pairs(r)]
-    if not pairs:
+    """Critic visual_rho vs the computed Spearman rho, over critiques made with the image (critique.vision
+    true) only; n_text counts the text-only critiques with a rho, which are not scored."""
+    mine = [r for r in runs if r.arm in LLM_ARMS and r.pool in pools]
+    pairs = [pr for r in mine for pr in critic_pairs(r, vision=True)]
+    n_text = sum(len(critic_pairs(r, vision=False)) for r in mine)
+    if not pairs and not n_text:
         return None
-    return {"visual_rho_mae": float(np.mean([abs(v - c) for v, c in pairs])), "n": len(pairs)}
+    mae = float(np.mean([abs(v - c) for v, c in pairs])) if pairs else None
+    return {"visual_rho_mae": mae, "n": len(pairs), "n_text": n_text}
 
 
 def claims_block(runs, pools):
@@ -204,41 +232,40 @@ def ceilings_block(data, pools):
     return out
 
 
-def prereg_sha(runs, root):
-    shas = Counter(r.header.get("prereg_sha") for r in runs if r.header.get("prereg_sha"))
-    if shas:
-        return shas.most_common(1)[0][0]
-    try:
-        out = subprocess.run(["git", "-C", str(root), "rev-parse", "--short=12", "prereg-v1^{commit}"],
-                             check=False, capture_output=True, text=True, timeout=10)
-        if out.returncode == 0:
-            return out.stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        pass
-    return "unfrozen"
+def prereg_sha(root):
+    """The commit of tag prereg-v1 (git rev-parse prereg-v1^{commit}), or "unfrozen" before the freeze."""
+    return prereg_commit(root) or "unfrozen"
 
 
 def compute(root=ROOT, include_mock=False, status=None, pools=TEST_POOLS):
+    """(results, pools_doc, runs). runs is every run loaded, including excluded ones (Run.excluded set);
+    only the others enter the analysis. Raises MaceCoverageError when an analysed pool lacks MACE values."""
     root = Path(root)
+    pools = list(pools)
     data = load_data(root / "data")
+    coverage = data.require_mace(pools)
     base = pd.read_parquet(root / "results" / "baselines.parquet")
     hit_of = dict(zip(data.labels.id, data.labels.hit.astype(bool)))
-    runs = load_runs(root / "runs", hit_of, include_mock)
+    pool_of = dict(zip(data.universe.id, data.universe.pool))
+    all_runs = load_runs(root / "runs", hit_of, include_mock, pool_of)
+    runs = [r for r in all_runs if r.excluded is None]
     pool_hits = {p: data.pool_hits(p) for p in pools}
     pool_n = {p: len(data.pool(p)) for p in pools}
     n_total = sum(pool_n.values())
 
     arm_flags = {**baseline_runs(base, pools), **llm_runs(runs, pools)}
-    arms = [arm_entry(a, "baseline" if a in BASELINE_ARMS else "llm", arm_flags[a], pool_hits, pool_n)
+    harness = llm_runs(runs, pools, value=lambda r: r.harness_share)
+    arms = [arm_entry(a, "baseline" if a in BASELINE_ARMS else "llm", arm_flags[a], pool_hits, pool_n,
+                      harness.get(a))
             for a in [*BASELINE_ARMS, *LLM_ARMS] if a in arm_flags]
     used_mock = any(r.mock for r in runs)
     results = {
         "generated": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": "mock" if used_mock else (status or "pilot"),
-        "prereg_sha": prereg_sha(runs, root),
+        "prereg_sha": prereg_sha(root),
         "budget": BUDGET,
         "base_rate": sum(pool_hits.values()) / n_total,
-        "pools": [{"pool": p, "n": pool_n[p], "hits": pool_hits[p]} for p in pools],
+        "pools": [{"pool": p, "n": pool_n[p], "hits": pool_hits[p], "mace_coverage": coverage[p]} for p in pools],
         "arms": arms,
         "tests": tests_block(arm_flags),
         "calibration": calibration_block(runs, pools),
@@ -248,7 +275,7 @@ def compute(root=ROOT, include_mock=False, status=None, pools=TEST_POOLS):
         "claims": claims_block(runs, pools),
         "ceilings": ceilings_block(data, pools),
     }
-    return clean(results), clean(pools_doc(data)), runs
+    return clean(results), clean(pools_doc(data)), all_runs
 
 
 def pools_doc(data):
@@ -283,19 +310,28 @@ def main(argv=None):
     ap.add_argument("--pools", nargs="+", default=TEST_POOLS, help="analysis pools (P0 only for pilot checks)")
     a = ap.parse_args([] if argv is None else argv)
     root = Path(a.root)
-    results, pools, runs = compute(root, a.include_mock, a.status, a.pools)
+    try:
+        results, pools, runs = compute(root, a.include_mock, a.status, a.pools)
+    except MaceCoverageError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     write_json(results, root / "results" / "results.json")
     (root / "results" / "pools.json").write_text(json.dumps(pools, separators=(",", ":"), allow_nan=False) + "\n")
     for r in runs:
         for msg in r.mismatches:
             print(f"warning: {r.run_id}: {msg}")
-    print(f"{len(runs)} LLM runs; status {results['status']}")
+        if r.excluded:
+            print(f"excluded: {r.run_id}: {r.excluded}")
+    n_used = sum(r.excluded is None for r in runs)
+    print(f"{n_used} LLM runs analysed ({len(runs) - n_used} excluded); status {results['status']}")
     for arm in results["arms"]:
         print(f"{arm['arm']} {arm['label']:28s} n={arm['n_runs']:4d} hits@40 {arm['hits_mean']:.2f} "
-              f"[{arm['hits_ci'][0]:.2f}, {arm['hits_ci'][1]:.2f}]")
+              f"[{arm['hits_ci'][0]:.2f}, {arm['hits_ci'][1]:.2f}]"
+              + (f" harness share {arm['harness_share']:.2f}" if arm.get("harness_share") is not None else ""))
     for t in results["tests"]:
         print(f"{t['name']}: diff {t['diff']:+.2f} [{t['ci'][0]:+.2f}, {t['ci'][1]:+.2f}] p={t['p']:.4f}")
+    return 0
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

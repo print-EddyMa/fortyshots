@@ -58,34 +58,59 @@ def make_data(root, pool_size=120, seed=0):
 
 
 def write_run(root, arm, pool, seed, picks, hit_of, p_hits=None, mock=True, critiques=(), claims=None,
-              stamp="202610301200"):
+              stamp="202610301200", budget=BUDGET, git_sha="0" * 40, harness_picks=None, extra=None,
+              vision=True):
+    """A run directory shaped like a real campaign's: header, one dft_order + dft_result pair per batch of
+    10 purchases, calibration/critique pairs, claimcheck and a final summary event equal to summary.json.
+    Leak probes (L, L2) buy nothing, so they get no DFT events."""
     run_id = f"{'mock-' if mock else ''}{arm}-{pool}-s{seed}-{stamp}"
     d = Path(root) / "runs" / run_id
     d.mkdir(parents=True, exist_ok=True)
+    probe = arm in ("L", "L2")
     flags = [bool(hit_of[i]) for i in picks]
     first = next((k + 1 for k, f in enumerate(flags) if f), None)
-    summary = {"arm": arm, "pool": pool, "seed": seed, "hits": sum(flags), "spent": len(picks), "picks": picks,
-               "hit_flags": flags, "lookups_to_first_hit": first, "brier": None,
+    summary = {"run_id": run_id, "arm": arm, "pool": pool, "seed": seed, "mode": "mock" if mock else "recorded",
+               "hits": sum(flags), "spent": 0 if probe else len(picks), "picks": list(picks), "hit_flags": flags,
+               "lookups_to_first_hit": first, "brier": None,
                "p_hits": p_hits if p_hits is not None else [None] * len(picks), "duration_s": 60.0,
                "aborted": False, "autofill": 0}
-    events = [{"seq": 0, "t": "2026-10-30T12:00:00Z", "run_id": run_id, "round": 0, "role": "system",
-               "kind": "header", "payload": {"arm": arm, "pool": pool, "seed": seed, "mode": "mock",
-                                             "prereg_sha": "test0000"}}]
-    for rnd, (visual_rho, spearman) in enumerate(critiques, start=2):
-        events.append({"seq": len(events), "round": rnd, "role": "system", "kind": "calibration",
-                       "payload": {"n": 10 * (rnd - 1), "spearman": spearman, "auc": 0.5, "image": None}})
-        events.append({"seq": len(events), "round": rnd, "role": "critic", "kind": "critique",
-                       "payload": {"visual_rho": visual_rho, "vetoes": [], "notes": ""}})
+    if harness_picks is not None:
+        summary["harness_picks"] = len(harness_picks)
+        summary["harness_pick_ids"] = list(harness_picks)
+    summary.update(extra or {})
+    events = []
+
+    def emit(rnd, role, kind, payload):
+        events.append({"seq": len(events), "t": "2026-10-30T12:00:00Z", "run_id": run_id, "round": rnd,
+                       "role": role, "kind": kind, "payload": payload})
+
+    emit(0, "system", "header", {"arm": arm, "pool": pool, "seed": seed, "budget": budget, "rounds": budget // 10,
+                                 "batch": 10, "mode": summary["mode"], "prereg_sha": "test0000",
+                                 "git_sha": git_sha})
+    cal = dict(enumerate(critiques, start=2))
+    for k in range(0, 0 if probe else len(picks), 10):
+        rnd = k // 10 + 1
+        if rnd in cal:
+            visual_rho, spearman = cal.pop(rnd)
+            emit(rnd, "system", "calibration", {"n": k, "spearman": spearman, "auc": 0.5, "image": None})
+            emit(rnd, "critic", "critique", {"visual_rho": visual_rho, "vetoes": [], "notes": "", "vision": vision})
+        batch = picks[k:k + 10]
+        emit(rnd, "system", "dft_order", {"ids": batch, "rationale": "", "spent": k + len(batch),
+                                          "remaining": budget - k - len(batch)})
+        emit(rnd, "system", "dft_result", {
+            "results": [{"id": i, "E_CO2": -0.6, "E_H2O": 0.0, "hit": bool(hit_of[i])} for i in batch],
+            "hits_total": sum(flags[:k + len(batch)]), "spent": k + len(batch)})
     if claims:
-        events.append({"seq": len(events), "round": 4, "role": "system", "kind": "claimcheck", "payload": claims})
-    events.append({"seq": len(events), "round": 4, "role": "system", "kind": "summary", "payload": summary})
+        emit(4, "system", "claimcheck", claims)
+    emit(5, "system", "summary", summary)
     (d / "events.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
     (d / "summary.json").write_text(json.dumps(summary))
     return run_id
 
 
 def make_mock_runs(root, data, pools=("P1", "P2"), seeds=2, seed=1):
-    """Mock A4/A5/A6 runs: greedy-by-label-with-noise picks so the LLM arms differ from random."""
+    """Mock A4/A5/A6 runs: greedy-by-label-with-noise picks so the LLM arms differ from random. In every
+    A5/A6 run the last (seed + 1) * 5 purchases are logged as harness picks (end-of-run autofill)."""
     rng = np.random.default_rng(seed)
     hit_of = dict(zip(data.labels.id, data.labels.hit.astype(bool)))
     for arm, noise in (("A4", 1.0), ("A5", 0.3), ("A6", 0.5)):
@@ -97,10 +122,7 @@ def make_mock_runs(root, data, pools=("P1", "P2"), seeds=2, seed=1):
                 p_hits = [float(np.clip(0.5 - 0.5 * score[k], 0, 1)) for k in np.argsort(score)[:BUDGET]]
                 write_run(root, arm, pool, s, picks, hit_of, p_hits=p_hits if arm != "A4" else None,
                           critiques=[(0.1, 0.05), (0.2, 0.3)] if arm != "A4" else (),
+                          harness_picks=picks[BUDGET - (s + 1) * 5:] if arm != "A4" else None,
                           claims={"n_claims": 10, "verified": 9, "flagged": [{"claim": "x", "reason": "y"}]})
     ranking = rng.permutation(data.pool("P1").id.to_numpy()).tolist()
-    run_id = write_run(root, "L", "P1", 0, ranking[:BUDGET], hit_of)
-    path = Path(root) / "runs" / run_id / "summary.json"
-    summary = json.loads(path.read_text())
-    summary["ranking"] = ranking
-    path.write_text(json.dumps(summary))
+    write_run(root, "L", "P1", 0, ranking[:BUDGET], hit_of, extra={"ranking": ranking})

@@ -1,4 +1,6 @@
-"""Minimal structural validators for results.json and pools.json (CONTRACTS.md). Return a list of errors."""
+"""Minimal structural validators for results.json and pools.json (CONTRACTS.md). Return a list of errors.
+
+Keys whose spec is wrapped in Optional(...) may be absent (CONTRACTS.md addenda); every other key is required."""
 NUM = (int, float)
 OPT_NUM = (int, float, type(None))
 
@@ -9,7 +11,8 @@ def _check(obj, spec, path, errs):
             errs.append(f"{path}: expected object")
             return
         for k in spec.keys() - obj.keys():
-            errs.append(f"{path}.{k}: missing")
+            if not isinstance(spec[k], Optional):
+                errs.append(f"{path}.{k}: missing")
         for k in obj.keys() - spec.keys():
             errs.append(f"{path}.{k}: unexpected key")
         for k in spec.keys() & obj.keys():
@@ -23,6 +26,8 @@ def _check(obj, spec, path, errs):
             errs.append(f"{path}: expected {n} items, got {len(obj)}")
         for i, x in enumerate(obj):
             _check(x, item, f"{path}[{i}]", errs)
+    elif isinstance(spec, Optional):
+        _check(obj, spec.inner, path, errs)
     elif isinstance(spec, Nullable):
         if obj is not None:
             _check(obj, spec.inner, path, errs)
@@ -41,6 +46,13 @@ class Nullable:
         self.inner = inner
 
 
+class Optional:
+    """A key that may be absent; when present it must match inner."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+
 class OneOf:
     def __init__(self, *values):
         self.values = values
@@ -49,15 +61,15 @@ class OneOf:
 PAIR = [NUM, 2]
 ARM = {"arm": str, "label": str, "kind": OneOf("baseline", "llm"), "n_runs": int, "hits_mean": NUM,
        "hits_ci": PAIR, "enrichment": OPT_NUM, "lookups_per_hit": OPT_NUM, "first_hit_mean": NUM,
-       "curve": [NUM, 41], "curve_lo": [NUM, 41], "curve_hi": [NUM, 41]}
+       "curve": [NUM, 41], "curve_lo": [NUM, 41], "curve_hi": [NUM, 41], "harness_share": Optional(OPT_NUM)}
 RESULTS = {
     "generated": str, "status": OneOf("mock", "pilot", "final"), "prereg_sha": str, "budget": int,
     "base_rate": NUM,
-    "pools": [{"pool": str, "n": int, "hits": int}],
+    "pools": [{"pool": str, "n": int, "hits": int, "mace_coverage": Optional(NUM)}],
     "arms": [ARM],
-    "tests": [{"name": str, "diff": NUM, "ci": PAIR, "p": NUM}],
+    "tests": [{"name": str, "diff": NUM, "ci": PAIR, "p": NUM, "ci_note": Optional(str)}],
     "calibration": Nullable({"brier": NUM, "n": int, "bins": [{"p_mean": NUM, "hit_rate": NUM, "n": int}]}),
-    "critic": Nullable({"visual_rho_mae": NUM, "n": int}),
+    "critic": Nullable({"visual_rho_mae": OPT_NUM, "n": int, "n_text": Optional(int)}),
     "honesty": {"mace_auc": OPT_NUM, "mace_auc_ci": Nullable(PAIR), "gas_relax_auc": OPT_NUM,
                 "dft_init_auc": OPT_NUM, "mace_mae_dft_geom": OPT_NUM, "eqv2_mae_dft_geom": OPT_NUM, "notes": str},
     "leak": Nullable({"L_auc": OPT_NUM, "L2_auc": OPT_NUM}),

@@ -20,6 +20,7 @@ These are fixed in `CONTRACTS.md`, and this file repeats them.
 
 - **Universe.** ODAC23 IS2R pristine MOFs with both CO2 and H2O single-adsorbate DFT labels and at most 200 atoms including the adsorbate. Train split: 3,026 MOFs, 85 hits.
 - **Labels.** For each gas, the minimum `y_relaxed` over the ODAC placements, in eV (PBE+D3). These are reference labels, not ground truth. The empty-MOF references were later revised in ODAC25.
+- **Config filter (disclosed).** `physics/extract.py` drops every ODAC config with |`y_relaxed`| ≥ 5 eV before anything else is built. This is a filter on the DFT label, and it decides which placements exist downstream: the placements the label is the minimum over, the placements MACE is run on (up to 5 per gas, by config name, from those kept), and, if every placement of a gas is dropped, whether the MOF is in the universe at all. It is applied once, before the pools are drawn, so it affects all arms equally; but the cheap oracle never sees placements that the filter removed for having extreme DFT energies.
 - **Hit.** `E_CO2 < −0.5 eV` and `E_CO2 < E_H2O`.
 - **Score** (lower is better). `S = E_CO2 + max(0, E_CO2 − E_H2O + 0.1)`.
 - **Pools.** Six disjoint pools of 500 train-split MOFs (seed 20261029):
@@ -29,7 +30,7 @@ These are fixed in `CONTRACTS.md`, and this file repeats them.
 
 ## 4. Budget and protocol
 
-40 lookups per campaign, in 4 rounds of 10. A lookup returns `E_CO2`, `E_H2O` and `hit` for that MOF only. `request_dft` enforces the budget in code. A campaign that aborts is scored on what it bought; this is intention to treat, and the rest of its budget counts as misses. The ledger records any picks autofilled by the harness, and they count as the agent's picks.
+40 lookups per campaign, in 4 rounds of 10. A lookup returns `E_CO2`, `E_H2O` and `hit` for that MOF only. `request_dft` enforces the budget in code. A campaign that aborts (time cap or repeated model errors) is never dropped or re-rolled; this is intention to treat. **Autofill:** lookups still unspent when a campaign ends are bought by the harness: remaining lookups are bought in S_mace order (arm-neutral). Autofilled picks count as the agent's picks, and the ledger records them.
 
 ## 5. Arms
 
@@ -64,13 +65,14 @@ All arms see the same information: label-free descriptors (`data/descriptors.par
 
 **Secondary** (reported with CIs; no multiplicity correction; labelled exploratory):
 1. A5 − A0 and A5 − A6 hits@40, using the same test.
-2. Enrichment: hits@40 ÷ (40 × the pool's base rate), averaged over pools.
+2. Enrichment: for each pool, the arm's mean hits@40 in that pool ÷ (40 × that pool's base rate, hits ÷ 500); then the mean of these ratios over pools, each pool weighted equally. (This is not the pooled mean hits@40 divided by the pooled random expectation.)
 3. Lookups to first hit (41 when a run has no hit), and lookups per hit (total lookups ÷ total hits).
 4. Discovery curve: mean cumulative hits after k = 0…40 lookups, with pointwise 95% bands.
 5. Calibration of the agent's P(hit) over every A5 pick that has a probability: Brier score and a reliability diagram (10 equal-width bins).
-6. Critic `visual_rho` against the computed Spearman ρ of the same round's calibration: mean absolute error.
+6. Critic `visual_rho` against the computed Spearman ρ of the same round's calibration: mean absolute error, over critiques made with the parity image (`critique.vision` true) only. Text-only critiques are counted and reported separately (`n_text`), never scored.
 7. Claim-check pass rate (claims verified ÷ claims), and the count of schema failures.
 8. Leak probe AUC.
+9. Harness-pick share, per LLM arm: the share of a campaign's purchases chosen by code rather than the model (proposer fallbacks, live reject replacements and end-of-run autofill; `summary.harness_picks`), averaged like hits (per pool, then over pools). Descriptive, not tested. Runs recorded before the field existed count as 0.
 
 **Ceilings, per pool at 40 lookups.**
 - Oracle: min(40, hits in the pool).
@@ -103,6 +105,8 @@ Recording order per night: A5 first, then A4, A6, L. A run that crashes is resum
   - Differences resample pools jointly, and runs independently per arm.
 - **Fixed seeds.** Every Monte-Carlo routine has a fixed seed derived from the name of the quantity (CRC32), so `python -m bench.verify` reproduces every number exactly.
 - **Computation.** `bench/stats.py` and `bench/results.py` compute everything, from `runs/`, `data/` and `results/baselines.parquet`, with no model calls.
+- **Integrity.** Each run's purchase order is rebuilt from its ledger (`dft_order` / `dft_result` events); a summary that disagrees with its ledger, header, pool or labels is a verification failure and the run is left out. Runs whose budget is not 40 are left out with a logged reason. No result is computed for a pool whose cheap MACE values are incomplete; missing values are never imputed or ranked last.
+- **Fingerprint.** `results.json` reports `prereg_sha` as the commit of tag `prereg-v1`. `python -m bench.verify` checks that every analysed non-mock run was recorded from that commit or a descendant of it.
 
 ## 9. Reporting rules (pre-committed)
 

@@ -4,13 +4,14 @@ A0 random      uniform without replacement.
 A1 heuristic   eligible = open metal site and 3.3 <= PLD <= 6 A. Order: eligible first, then OMS
                without the PLD window, then the rest; within each group cheaper metal_cost_tier first,
                then higher metal-site density (metal atoms per nm^3), then a seeded random tie-break.
-A2 MACE greedy ascending S_mace (MOFs without a cheap value last), seeded random tie-break.
+A2 MACE greedy ascending S_mace, seeded random tie-break.
 A3 RF-UCB      round 1: 10 uniform random; rounds 2-4: RF (bench.surrogate, 500 trees, random_state =
                seed) on all bought labels, buy the 10 unbought MOFs with the lowest mean - 1.0 * std of
                predicted S.
 
 Run: python -m bench.arms [--pools P0 P1 ...] [--seeds 50] [--out results/baselines.parquet]
 Output (long format): arm, pool, seed, order (1..40), round (1..4), id, hit.
+A2 and A3 refuse a pool with incomplete MACE values (MaceCoverageError) instead of ranking them as worst.
 """
 import argparse
 import sys
@@ -20,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from bench import surrogate
-from bench.common import ALL_POOLS, BATCH, BUDGET, ROOT, ROUNDS, load_data
+from bench.common import ALL_POOLS, BATCH, BUDGET, MACE_COLS, ROOT, ROUNDS, MaceCoverageError, load_data
 
 N_SEEDS = 50
 KAPPA = 1.0
@@ -67,6 +68,10 @@ def a3_rf_ucb(pool, rng, seed):
 
 
 def run_arm(arm, pool_df, seed):
+    if arm in ("A2", "A3"):
+        missing = int((~np.isfinite(pool_df[MACE_COLS].to_numpy(dtype=float)).all(axis=1)).sum())
+        if missing:
+            raise MaceCoverageError(f"{arm} on {pool_df.pool.iloc[0]}: {missing} of {len(pool_df)} MOFs lack MACE values")
     rng = rng_for(arm, pool_df.pool.iloc[0], seed)
     if arm == "A0":
         return a0_random(pool_df, rng)

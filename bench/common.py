@@ -1,4 +1,5 @@
 """Shared science constants and data loading for the benchmark (light venv only)."""
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +25,12 @@ ARM_LABELS = {
 }
 BASELINE_ARMS = ["A0", "A1", "A2", "A3"]
 LLM_ARMS = ["A4", "A5", "A6"]
+MACE_COLS = ["E_CO2_mace", "E_H2O_mace", "S_mace"]
+PREREG_TAG = "prereg-v1"
+
+
+class MaceCoverageError(ValueError):
+    """An analysed pool lacks cheap MACE values for some of its MOFs (results would be meaningless)."""
 
 
 def dac_score(co2, h2o):
@@ -56,6 +63,27 @@ class Data:
     def pool_hits(self, name):
         return int(self.pool(name).hit.sum())
 
+    def mace_coverage(self, name):
+        """Fraction of the pool's MOFs with finite E_CO2_mace, E_H2O_mace and S_mace."""
+        df = self.pool(name)
+        if not len(df):
+            return 0.0
+        return float(np.isfinite(df[MACE_COLS].to_numpy(dtype=float)).all(axis=1).mean())
+
+    def require_mace(self, pools):
+        """Raise MaceCoverageError unless every pool has complete MACE values; returns {pool: coverage}."""
+        cov = {p: self.mace_coverage(p) for p in pools}
+        bad = {p: c for p, c in cov.items() if c < 1.0}
+        if bad:
+            detail = ", ".join(f"{p} {c:.1%} ({round(c * len(self.pool(p)))}/{len(self.pool(p))})"
+                               for p, c in bad.items())
+            ok = [p for p in pools if p not in bad]
+            raise MaceCoverageError(
+                f"incomplete MACE values in data/mace_cache.parquet for analysed pool(s): {detail}. Missing cheap "
+                f"values are never treated as worst; finish physics/mace_cache.py or analyse a subset with "
+                f"--pools {' '.join(ok) if ok else '<pools with complete MACE>'}.")
+        return cov
+
 
 def load_data(data_dir=None):
     d = Path(data_dir) if data_dir else ROOT / "data"
@@ -64,3 +92,25 @@ def load_data(data_dir=None):
         columns=["id", "E_CO2_mace", "E_H2O_mace", "S_mace"])
     desc = pd.read_parquet(desc_path) if desc_path.exists() else pd.DataFrame(columns=["id"])
     return Data(pd.read_parquet(d / "universe.parquet"), pd.read_parquet(d / "labels.parquet"), mace, desc)
+
+
+def _git(root, *args):
+    try:
+        return subprocess.run(["git", "-C", str(root), *args], check=False, capture_output=True, text=True,
+                              timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def prereg_commit(root=ROOT, tag=PREREG_TAG):
+    """Full commit sha of the pre-registration tag, or None when the tag (or git) is absent."""
+    out = _git(root, "rev-parse", "--verify", "--quiet", f"{tag}^{{commit}}")
+    return out.stdout.strip() if out is not None and out.returncode == 0 and out.stdout.strip() else None
+
+
+def is_descendant(root, ancestor, sha):
+    """True when commit `sha` is `ancestor` or a descendant of it; False otherwise (including unknown shas)."""
+    if not sha:
+        return False
+    out = _git(root, "merge-base", "--is-ancestor", ancestor, str(sha))
+    return out is not None and out.returncode == 0

@@ -46,11 +46,16 @@ def test_contents(root):
     assert names[0].startswith("primary: A5 - A3")
     assert all(0 < t["p"] <= 1 for t in res["tests"])
     assert res["calibration"]["n"] == 2 * 2 * 40
-    assert res["critic"] == {"visual_rho_mae": 0.075, "n": 16}
+    assert res["critic"] == {"visual_rho_mae": 0.075, "n": 16, "n_text": 0}
     assert res["claims"] == {"n": 120, "verified": 108, "flagged": 12}
     assert res["leak"]["L_auc"] is not None and res["leak"]["L2_auc"] is None
     assert [c["pool"] for c in res["ceilings"]] == TEST_POOLS
-    assert res["prereg_sha"] == "test0000"
+    assert res["prereg_sha"] == "unfrozen"  # no prereg-v1 tag in the synthetic root; never a run header value
+    assert all(p["mace_coverage"] == 1.0 for p in res["pools"])
+    # Mock A5/A6 runs log 5 (seed 0) and 10 (seed 1) of 40 purchases as harness picks; A4 runs carry no key.
+    assert arm["A5"]["harness_share"] == arm["A6"]["harness_share"] == pytest.approx((0.125 + 0.25) / 2)
+    assert arm["A4"]["harness_share"] == 0.0
+    assert not any("harness_share" in arm[a] for a in ("A0", "A1", "A2", "A3"))
 
 
 def test_no_mock_by_default(root, tmp_path):
