@@ -49,7 +49,30 @@ def _config(args, arm: str, pool: str, seed: int, overrides: dict | None = None)
         vision=not (o.get("no_vision", args.no_vision)), shared_tools=bool(o.get("shared_tools", args.shared_tools)),
         cassette=args.cassette, cassette_from=Path(args.cassette_from) if args.cassette_from else None,
         chemist=bool(o.get("chemist", args.chemist)), rounds=rounds, budget=rounds * BATCH,
-        doctor_report=Path(args.doctor_report) if args.doctor_report else None)
+        doctor_report=Path(args.doctor_report) if args.doctor_report else _default_doctor_report(),
+        **_tuning(o))
+
+
+def _default_doctor_report():
+    """doctor/report.json when ./lab doctor has written one: per-call timeouts then use the measured speeds."""
+    p = Path("doctor/report.json")
+    return p if p.exists() else None
+
+
+def _tuning(o: dict) -> dict:
+    """Plan-file knobs for slow machines: per-role reasoning strength and the Director's tool-call cap.
+    Both are logged in every run header (header.config)."""
+    from .campaign import ROLE_STRENGTH, STRENGTHS
+
+    out = {}
+    if o.get("strengths"):
+        bad = {k: v for k, v in o["strengths"].items() if k not in ROLE_STRENGTH or v not in STRENGTHS}
+        if bad:
+            raise SystemExit(f"bad strengths in plan: {bad}")
+        out["strengths"] = {**ROLE_STRENGTH, **o["strengths"]}
+    if o.get("max_director_calls"):
+        out["max_calls"] = int(o["max_director_calls"])
+    return out
 
 
 def _transport(cfg):
