@@ -27,8 +27,8 @@ export function MethodPage() {
     <Page current="/method">
       <section className="prose-wrap page-head">
         <h1 className="h-section">
-          <span>Method.</span>
-          <span className="second">What was measured, and how.</span>
+          <span>How it works.</span>
+          <span className="second">What the AI does, and how we test it.</span>
         </h1>
         <nav className="toc" aria-label="On this page">
           {sections.map(([id, t]) => (
@@ -41,9 +41,16 @@ export function MethodPage() {
       </section>
       <article className="prose-wrap prose">
         <p>
-          fortyshots decides which expensive experiment to run next and shows its work. A direct-air-capture researcher with a
-          budget of 40 DFT calculations wants a metal–organic framework (MOF) that still binds CO2 when the air is humid. Water
-          usually wins the binding site, so most sorbents that look good on paper fail. The question is which 40 to compute.
+          <strong>In plain terms.</strong> Machines that pull CO2 out of the air (direct air capture) need a sponge-like material
+          that grabs CO2 and holds it. Metal–organic frameworks (MOFs) are promising sponges: crystals full of pores a few atoms
+          wide. The catch is humidity: in most of them, water takes the spot CO2 needs. Finding the few that work means running a
+          slow, accurate quantum-chemistry simulation (DFT) on each candidate, and a lab can only afford a few dozen.
+        </p>
+        <p>
+          fortyshots is an AI research agent that decides which candidates are worth those expensive simulations. It runs on
+          Meta&apos;s open Muse Glimmer 30B model, entirely on a laptop. In each of four rounds it explores the candidates with
+          tools, picks ten to test with a stated probability for each, critiques its picks by looking at structures and charts,
+          and learns from the results. A person approves each batch. Below is exactly how we built and tested it.
         </p>
 
         <h2 id="task">The task</h2>

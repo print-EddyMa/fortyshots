@@ -352,7 +352,7 @@ export function AtlasPlayer({ atlas, pool, seqs, batch = 10 }: { atlas: AtlasDat
           <div className="atlas-count" aria-live="polite">
             {hitsSoFar}
             <span className="unit">
-              hit{hitsSoFar === 1 ? '' : 's'} in {shownN} lookups
+              good material{hitsSoFar === 1 ? '' : 's'} found in {shownN} test{shownN === 1 ? '' : 's'}
             </span>
           </div>
           {seq.note && <p className="small" style={{ marginTop: 8 }}>{seq.note}</p>}
@@ -380,25 +380,25 @@ export function AtlasPlayer({ atlas, pool, seqs, batch = 10 }: { atlas: AtlasDat
             <svg width="12" height="12" aria-hidden>
               <circle cx="6" cy="6" r="1.8" fill="var(--fg-faint)" />
             </svg>
-            MOF in {pool} ({poolN}); other pools lighter
+            candidate material in this set ({poolN}); other sets lighter
           </span>
           <span>
             <svg width="12" height="12" aria-hidden>
               <circle cx="6" cy="6" r="2.8" fill="var(--fg)" />
             </svg>
-            hit in {pool} ({poolHits}), hidden until bought
+            good material ({poolHits} in this set), hidden until tested
           </span>
           <span>
             <svg width="12" height="12" aria-hidden>
               <circle cx="6" cy="6" r="5.5" fill="var(--fg)" />
             </svg>
-            purchase, numbered in order
+            tested, numbered in order
           </span>
           <span>
             <svg width="12" height="12" aria-hidden>
               <circle cx="6" cy="6" r="5.5" fill="var(--accent)" />
             </svg>
-            purchase that was a hit
+            tested and good
           </span>
         </div>
         {!reducedMotion() && (

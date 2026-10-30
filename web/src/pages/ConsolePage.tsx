@@ -118,6 +118,10 @@ export function ConsolePage({ runId, query }: { runId: string | null; query: URL
   return (
     <main className="console-page" data-theme="dark" id="main">
       <h1 className="sr-only">Run console{id ? `: ${id}` : ''}</h1>
+      <p className="console-intro">
+        <a href="#/">fortyshots</a> · You are watching the AI search for CO2-capture materials: it picks 40 of 500 candidates to
+        test, ten at a time. Each test reveals whether the material holds CO2 more strongly than water (a <em>hit</em>).
+      </p>
       {id ? (
         <RunConsole key={id} runId={id} results={results.data} query={query} />
       ) : (

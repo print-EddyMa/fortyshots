@@ -1138,3 +1138,15 @@ table.data.cand-table th {
   text-decoration: line-through;
   text-decoration-color: var(--fail);
 }
+
+.console-intro {
+  margin: 0;
+  padding: 8px 24px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--rule);
+}
+.console-intro a {
+  color: var(--fg);
+}

@@ -6,9 +6,9 @@ import { HeroMof } from '../components/HeroMof';
 import { AtlasPlayer, type AtlasSeq } from '../components/Atlas';
 import { loadAtlas, type AtlasData } from '../lib/chemData';
 import { derive } from '../lib/replay';
-import { REPO_URL, PREREG_URL } from '../lib/config';
+import { REPO_URL } from '../lib/config';
 import { hasMockRuns, isPreliminary, loadEvents, pickShowcase } from '../lib/data';
-import { ci, count, num, shortSha } from '../lib/format';
+import { ci, num } from '../lib/format';
 import { href } from '../lib/router';
 import type { IndexEntry, Results, RunEvent } from '../lib/types';
 import { useIndex, useResults } from '../lib/useData';
@@ -17,12 +17,12 @@ import { usePlayback } from '../lib/usePlayback';
 const repoPath = REPO_URL.replace(/^https?:\/\//, '');
 
 const TOUR: { key: string; label: string; caption: string; find: (e: RunEvent) => boolean }[] = [
-  { key: 'plan', label: 'Plan', caption: 'The Director reads what round 1 bought, checks the cheap simulator, and changes plan.', find: (e) => e.kind === 'llm_call' && e.role === 'director' && e.round === 2 },
-  { key: 'propose', label: 'Propose', caption: 'The Proposer commits to ten picks, each with a P(hit), before DFT is revealed.', find: (e) => e.kind === 'proposal' && e.round === 2 },
-  { key: 'critique', label: 'Critique', caption: 'The Critic reads its own parity plot through vision and vetoes weak picks.', find: (e) => e.kind === 'llm_call' && e.role === 'critic' && e.round === 2 },
-  { key: 'buy', label: 'Buy DFT', caption: 'Ten sealed DFT results open. CO2 moves to its DFT-relaxed pose.', find: (e) => e.kind === 'dft_order' && e.round === 2 },
-  { key: 'calibrate', label: 'Calibrate', caption: 'Calibration on the labels it paid for: does the cheap simulator rank anything?', find: (e) => e.kind === 'calibration' && e.round === 3 },
-  { key: 'report', label: 'Report', caption: 'The Reporter cites a tool call for every number. A deterministic checker flags the rest.', find: (e) => e.kind === 'report' },
+  { key: 'plan', label: 'Plan', caption: 'Plan: it reviews what it learned from the last tests and decides where to look next.', find: (e) => e.kind === 'llm_call' && e.role === 'director' && e.round === 2 },
+  { key: 'propose', label: 'Pick', caption: 'Pick: it chooses ten materials to test and says how likely each one is to work, before seeing any result.', find: (e) => e.kind === 'proposal' && e.round === 2 },
+  { key: 'critique', label: 'Check', caption: 'Check: it looks at the 3D structures and its own charts, and drops picks it no longer believes in.', find: (e) => e.kind === 'llm_call' && e.role === 'critic' && e.round === 2 },
+  { key: 'buy', label: 'Test', caption: 'Test: ten accurate simulations are revealed, and you see where CO2 actually sits in each material.', find: (e) => e.kind === 'dft_order' && e.round === 2 },
+  { key: 'calibrate', label: 'Learn', caption: 'Learn: it checks whether its quick physics estimates matched the real results, and adjusts.', find: (e) => e.kind === 'calibration' && e.round === 3 },
+  { key: 'report', label: 'Report', caption: 'Report: it explains what it found, and every number it writes is checked against the data.', find: (e) => e.kind === 'report' },
 ];
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -113,19 +113,19 @@ function AtlasSection({ showcase }: { showcase: IndexEntry }) {
   const paths = atlas.paths.by_pool[pool] ?? {};
   const mock = showcase.mode === 'mock' || showcase.run_id.startsWith('mock-');
   const seqs: AtlasSeq[] = [];
-  if (agent.length) seqs.push({ key: 'agent', label: 'Agent', ids: agent, note: `${showcase.run_id}${mock ? ' · mock run' : ''}` });
+  if (agent.length) seqs.push({ key: 'agent', label: 'fortyshots', ids: agent, note: `${showcase.run_id}${mock ? ' · mock run' : ''}` });
   if (paths.A0) seqs.push({ key: 'A0', label: 'Random', ids: paths.A0, note: `Random baseline, seed ${atlas.paths.seed}, results/baselines.parquet` });
-  if (paths.A2) seqs.push({ key: 'A2', label: 'MACE-greedy', ids: paths.A2, note: `Lowest cheap MACE score first, seed ${atlas.paths.seed}` });
-  if (paths.A3) seqs.push({ key: 'A3', label: 'RF-UCB', ids: paths.A3, note: `Random-forest UCB on bought labels, seed ${atlas.paths.seed}` });
+  if (paths.A2) seqs.push({ key: 'A2', label: 'Best simple', ids: paths.A2, note: `Tests the materials a quick physics estimate likes most (MACE-greedy), seed ${atlas.paths.seed}` });
+  if (paths.A3) seqs.push({ key: 'A3', label: 'ML model', ids: paths.A3, note: `A random-forest model trained on results so far picks the next tests (RF-UCB), seed ${atlas.paths.seed}` });
   return (
     <section className="wrap section" id="atlas">
       <div className="section-head">
-        <h2 className="label">Where it looked</h2>
-        <span className="small mono">{atlas.n.toLocaleString()} MOFs · t-SNE · no DFT labels as input</span>
+        <h2 className="label">How it searched</h2>
+        <span className="small mono">{atlas.n.toLocaleString()} materials · t-SNE map</span>
       </div>
       <p className="section-lede">
-        Every MOF in the six pools, placed by its pore geometry, density, metal and cheap MACE energies. Nearby points are similar
-        materials. The path is one campaign's 40 DFT purchases in {pool}, ten per round.
+        Each dot is a candidate material; similar materials sit close together. The numbered path shows the 40 materials one
+        search chose to test, in order, ten at a time. Switch to compare with random picking and simpler methods.
       </p>
       <AtlasPlayer atlas={atlas} pool={pool} seqs={seqs} />
     </section>
@@ -145,47 +145,37 @@ export function Landing() {
   const best = R?.arms.filter((x) => x.kind === 'baseline').reduce<typeof a0>((b, x) => (!b || x.hits_mean > b.hits_mean ? x : b), undefined);
   const prelim = isPreliminary(R, index.data);
   const nA5 = a5?.n_runs;
-  // Headline [H]: the A5 mean from results.json; until A5 is scored, the showcase run's own count (from the run index).
-  const H = a5 ? count(a5.hits_mean) : showcase ? String(showcase.hits) : '—';
 
   const series: CurveSeries[] = [];
   if (a0) series.push({ key: 'A0', label: 'Random', curve: a0.curve, lo: a0.curve_lo, hi: a0.curve_hi, tone: 'faint', band: true });
   const a2 = arm('A2');
-  if (a2) series.push({ key: 'A2', label: 'MACE-greedy', curve: a2.curve, tone: 'faint', dashed: true });
-  if (a3) series.push({ key: 'A3', label: 'RF-UCB', curve: a3.curve, lo: a3.curve_lo, hi: a3.curve_hi, tone: 'muted', band: true });
-  if (a5) series.push({ key: 'A5', label: 'Glimmer agent', curve: a5.curve, lo: a5.curve_lo, hi: a5.curve_hi, tone: 'fg', band: true, width: 1.5 });
+  if (a2) series.push({ key: 'A2', label: 'Best simple method', curve: a2.curve, tone: 'faint', dashed: true });
+  if (a3) series.push({ key: 'A3', label: 'Machine learning', curve: a3.curve, lo: a3.curve_lo, hi: a3.curve_hi, tone: 'muted', band: true });
+  if (a5) series.push({ key: 'A5', label: 'fortyshots', curve: a5.curve, lo: a5.curve_lo, hi: a5.curve_hi, tone: 'fg', band: true, width: 1.5 });
 
   return (
     <Page current="/">
       <section className="wrap hero">
-        <h1 className="display" aria-live="polite">
-          <span>
-            40 experiments. {H} hit{H === '1' ? '' : 's'}.
-          </span>
-          <span className="second">
-            Random finds {a0 ? count(a0.hits_mean) : '—'}. The best baseline finds {best ? count(best.hits_mean) : '—'}.
-          </span>
+        <p className="eyebrow mono">AI for materials discovery · runs on a laptop</p>
+        <h1 className="display">
+          <span>An AI scientist that finds carbon-capture materials.</span>
+          <span className="second">On a laptop, with no cloud.</span>
         </h1>
         <div className="hero-row">
           <p className="lede">
-            fortyshots is an offline AI lab. Meta's open-weights Muse Glimmer 30B runs on a 24 GB MacBook with Wi-Fi off.
-            It plans, commits to predictions, reads its own plots, and buys DFT results ten at a time.
+            Give fortyshots a goal, such as <em>find a material that pulls CO2 out of humid air</em>. It searches hundreds of
+            candidate materials, decides which few deserve an expensive simulation, learns from every result, and shows you each
+            step. It runs on Meta&apos;s open Muse Glimmer model on an ordinary MacBook.
           </p>
           <div className="hero-cta">
             <a className="btn btn-primary btn-lg" href={href(showcase ? `/console/${encodeURIComponent(showcase.run_id)}` : '/console')}>
-              Watch a run <span className="arrow" aria-hidden>→</span>
+              Watch it work <span className="arrow" aria-hidden>→</span>
             </a>
-            <CommandPill cmd={`git clone ${repoPath} && ./lab setup`} />
+            <a className="btn btn-secondary btn-lg" href={href('/results')}>
+              See the results
+            </a>
           </div>
         </div>
-        <p className="hero-fine">
-          {a5
-            ? `Mean hits at 40 lookups, n = ${nA5} Glimmer campaigns, 95% CI ${ci(a5.hits_ci[0], a5.hits_ci[1])}.`
-            : showcase
-              ? `Hits in one campaign (${showcase.run_id}); the agent arm is not scored yet. Baselines: mean of ${a0?.n_runs ?? '—'} and ${a3?.n_runs ?? '—'} runs.`
-              : ''} Hits are ODAC23 DFT reference labels (Meta FAIR) · pre-registered (
-          <a href={PREREG_URL}>prereg-v1 {shortSha(R?.prereg_sha)}</a>) · scored blind. <a href={href('/method')}>See the method</a>.
-        </p>
         {prelim && (
           <div className="hero-prelim">
             <Prelim status={R?.status} mockRuns={hasMockRuns(index.data)} />
@@ -195,13 +185,72 @@ export function Landing() {
 
       <section className="wrap">
         <HeroMof />
+        <p className="small muted fig-note">
+          A real candidate: a zinc-based framework with pores a few atoms wide. The orange-ringed molecules are CO2, shown where an
+          accurate simulation says they settle.
+        </p>
+      </section>
+
+      <section className="wrap section">
+        <div className="steps3">
+          <div className="step">
+            <span className="label">The problem</span>
+            <p>
+              Pulling CO2 out of the air needs a material that grabs CO2 even when the air is humid. In 85% of candidates, water
+              wins instead.
+            </p>
+          </div>
+          <div className="step">
+            <span className="label">The bottleneck</span>
+            <p>
+              Checking one candidate properly takes a quantum-chemistry simulation (DFT): hours of supercomputer time. A lab can
+              afford a few dozen, out of thousands.
+            </p>
+          </div>
+          <div className="step">
+            <span className="label">What fortyshots does</span>
+            <p>
+              It chooses which few to test. It reasons about the candidates, commits to predictions, checks its own work and learns
+              from each result, with a person approving every batch.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap section">
+        <div className="section-head">
+          <h2 className="label">Does it work?</h2>
+          <a className="link-quiet label" href={href('/results')}>
+            Full results <span aria-hidden>→</span>
+          </a>
+        </div>
+        <div className="answer">
+          <div className="answer-row">
+            <span className="answer-label">Random picking</span>
+            <span className="answer-val mono">{a0 ? num(a0.hits_mean, 1) : '—'}</span>
+          </div>
+          <div className="answer-row">
+            <span className="answer-label">Best simple method</span>
+            <span className="answer-val mono">{best ? num(best.hits_mean, 1) : '—'}</span>
+          </div>
+          <div className="answer-row answer-us">
+            <span className="answer-label">fortyshots</span>
+            <span className="answer-val mono">{a5 ? num(a5.hits_mean, 1) : '—'}</span>
+          </div>
+        </div>
+        <p className="small muted">
+          Good materials found with 40 tests, out of 500 candidates (about 14 good ones are hidden in each set). Averaged over five
+          sets, scored blind against Meta FAIR&apos;s Open DAC 2023 simulations, on a plan we published before running.
+          {a5 ? ` fortyshots: ${nA5} runs, 95% interval ${ci(a5.hits_ci[0], a5.hits_ci[1])}.` : ' fortyshots results appear here once its recorded runs are scored.'}{' '}
+          <a href={href('/method')}>How we test</a>.
+        </p>
       </section>
 
       {showcase && <AtlasSection showcase={showcase} />}
 
       <section className="wrap section">
         <div className="section-head">
-          <h2 className="label">Inside a run</h2>
+          <h2 className="label">Watch it think</h2>
         </div>
         {showcase && <Hero showcase={showcase} results={R} />}
       </section>
@@ -212,23 +261,23 @@ export function Landing() {
         </div>
         <div className="rows how">
           <div className="row">
-            <span className="name">Muse Glimmer 30B</span>
-            <span className="desc">Director, Proposer, Critic and Reporter. One open-weights model with Meta's DFlash drafter, on a laptop.</span>
+            <span className="name">The AI</span>
+            <span className="desc">Meta&apos;s open Muse Glimmer 30B, running on the laptop. One model plays four roles: planner, picker, critic and reporter. It uses tools, reads images and writes structured answers.</span>
             <span className="trail">llama.cpp</span>
           </div>
           <div className="row">
-            <span className="name">MACE-MP-0</span>
-            <span className="desc">Cheap physics for all 500 candidates. Noisy, and the agent is not told how noisy.</span>
+            <span className="name">Quick estimates</span>
+            <span className="desc">A fast physics model (MACE) scores every candidate in seconds. Cheap, but often wrong, and the AI is not told how wrong.</span>
             <span className="trail">precomputed</span>
           </div>
           <div className="row">
-            <span className="name">ODAC23 DFT</span>
-            <span className="desc">The expensive experiments: Meta FAIR's DFT labels, sealed until the agent buys them.</span>
+            <span className="name">Real tests</span>
+            <span className="desc">Accurate quantum-chemistry results from Meta FAIR&apos;s Open DAC 2023 dataset, kept hidden until the AI spends one of its 40 tests.</span>
             <span className="trail">40 lookups</span>
           </div>
           <div className="row">
             <span className="name">You</span>
-            <span className="desc">Approve each batch in live mode. Recorded runs auto-approve, and the ledger says so.</span>
+            <span className="desc">Approve each batch before it is tested, and decide which newly proposed materials are worth making.</span>
             <span className="trail">a · r</span>
           </div>
         </div>
@@ -237,14 +286,14 @@ export function Landing() {
       {series.length > 0 && (
         <section className="wrap section">
           <div className="section-head">
-            <h2 className="label">Hits as the budget is spent</h2>
+            <h2 className="label">Good materials found, test by test</h2>
             <a className="link-quiet label" href={href('/results')}>
               All results <span aria-hidden>→</span>
             </a>
           </div>
           <p className="section-lede">
-            Mean hits after each DFT lookup, with 95% bands. A hit binds CO2 below −0.5 eV and more strongly than water.
-            The base rate is {R ? num(R.base_rate * 100, 1) : '—'}%.
+            How many good materials each method has found after each test, averaged, with 95% bands. A good material binds CO2
+            strongly and more strongly than water; {R ? num(R.base_rate * 100, 1) : '—'}% of candidates qualify.
           </p>
           <DiscoveryChart series={series} height={300} labelWidth={150} title="Mean hits against DFT lookups for the agent and baselines" />
         </section>
@@ -253,7 +302,7 @@ export function Landing() {
       <section className="wrap section">
         <div className="closing">
           <h2 className="h-section">
-            Runs on your laptop. <span className="second">Clone it and check every number.</span>
+            Open source. Runs on your laptop. <span className="second">Every number can be checked.</span>
           </h2>
           <CommandPill cmd={`git clone ${repoPath}`} />
         </div>

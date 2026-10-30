@@ -612,3 +612,79 @@ main:focus {
 .notfound {
   padding: 160px 0 40px;
 }
+
+/* Landing: plain-language explainer blocks */
+.eyebrow {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.fig-note {
+  margin: 12px 0 0;
+  max-width: 62ch;
+}
+.steps3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+}
+.steps3 .step {
+  padding: 20px 24px 4px 0;
+}
+.steps3 .step + .step {
+  padding-left: 24px;
+  border-left: 1px solid var(--rule);
+}
+.steps3 .step p {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+@media (max-width: 860px) {
+  .steps3 {
+    grid-template-columns: 1fr;
+  }
+  .steps3 .step,
+  .steps3 .step + .step {
+    padding: 18px 0 6px;
+    border-left: 0;
+  }
+  .steps3 .step + .step {
+    border-top: 1px solid var(--rule);
+  }
+}
+.answer {
+  border-top: 1px solid var(--rule);
+  margin: 4px 0 14px;
+}
+.answer-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.answer-label {
+  font-size: 18px;
+  color: var(--fg-muted);
+}
+.answer-val {
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+.answer-us .answer-label,
+.answer-us .answer-val {
+  color: var(--fg);
+}
+.answer-us .answer-val {
+  color: var(--accent);
+}
