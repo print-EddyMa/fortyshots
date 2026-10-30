@@ -255,8 +255,10 @@ class Plan:
             width_chars = int((W - 2 * margin) / (adv * size))
             laid = []
             for text, color in lines:
-                for ln in wrap(text, width_chars):
-                    laid.append((ln, color))
+                # one sentence per line where it fits; wrap the rest
+                for sent in re.split(r"(?<=[.!?])\s+", text.strip()):
+                    for ln in wrap(sent, width_chars):
+                        laid.append((ln, color))
         else:
             longest = max((len(t) for t, _ in lines), default=1)
             size = int(min(64, (W - 2 * margin) / (adv * longest)))
@@ -531,6 +533,11 @@ def main() -> int:
     ap.add_argument("--advance", type=float, default=0.6)
     a = ap.parse_args()
     a.font_medium = a.font_medium or a.font
+    # render.sh runs inside the work dir: make every path absolute
+    a.font, a.font_medium, a.fontsdir = (str(Path(x).resolve()) for x in (a.font, a.font_medium, a.fontsdir))
+    for k in ("voice", "live", "cuts", "out"):
+        if getattr(a, k):
+            setattr(a, k, str(Path(getattr(a, k)).resolve()))
     p = Plan(a)
     p.work.mkdir(parents=True, exist_ok=True)
     text = p.script()

@@ -593,7 +593,8 @@ def main() -> int:
         qs = quoted(cap_cell)
         text = fill(qs[0]) if qs else ""
         if re.search(r"\+\s*site URL", cap_cell):
-            text = f"{text} {values.get('SITE_URL', '[SITE_URL]')}".strip()
+            url = re.sub(r"^https?://", "", values.get("SITE_URL", "[SITE_URL]")).rstrip("/")
+            text = f"{text} {url}".strip()
         if wifi and "Wi-Fi off" in cap_cell and "Wi-Fi" not in text:
             text = text.replace("No cloud.", "No cloud. Wi-Fi off.", 1) if "No cloud." in text else f"Wi-Fi off. {text}"
         xrows.append({"dst": [float(m.group(1)), float(m.group(2))], "picture": cells[1], "caption": text})

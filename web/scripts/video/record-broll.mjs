@@ -170,7 +170,9 @@ iframe{display:block;border:0;width:${f.vw}px;height:${f.vh}px;background:#0d0d0
 const server = createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__broll.html') {
-    const f = FORMATS[u.searchParams.get('f')] ?? FORMATS.desktop;
+    const base = FORMATS[u.searchParams.get('f')] ?? FORMATS.desktop;
+    const vw = Number(u.searchParams.get('vw')) || base.vw;
+    const f = { ...base, vw, vh: Math.round(base.out[1] / (base.out[0] / vw)), scale: base.out[0] / vw };
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' });
     return res.end(wrapperHtml(f));
   }
@@ -182,8 +184,20 @@ const BASE = `http://127.0.0.1:${server.address().port}/`;
 // ------------------------------------------------------------------------------------------- shot context
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Close-up framing for the console on desktop: a wider right column (trace, queue, model tab) so a 16:9
+// close-up of it is not half candidate table. Same components, only the column widths change.
+const FOCUS_CSS = `
+@media (min-width: 1280px) {
+  .console-page .c-grid { grid-template-columns: 220px minmax(0, 1fr) 640px !important; }
+}
+.c-right .tool-img { max-width: 300px !important; }
+.c-right .viewer-frame { aspect-ratio: auto !important; height: 230px !important; }
+`;
+
 async function makeShot(browser, fmt, opts = {}) {
-  const f = FORMATS[fmt];
+  const base = FORMATS[fmt];
+  const vw = (fmt === 'desktop' && opts.vw) || base.vw;
+  const f = { ...base, vw, vh: Math.round(base.out[1] / (base.out[0] / vw)), scale: base.out[0] / vw };
   const tmpDir = join(OUT, '.tmp');
   mkdirSync(tmpDir, { recursive: true });
   const zoomMax = opts.zoom ?? 1;
@@ -201,7 +215,7 @@ async function makeShot(browser, fmt, opts = {}) {
   }, dpr);
   const page = await ctx.newPage();
   const t0 = Date.now();
-  await page.goto(`${BASE}__broll.html?f=${fmt}`);
+  await page.goto(`${BASE}__broll.html?f=${fmt}&vw=${vw}`);
   const frame = await (await page.$('#site')).contentFrame();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -220,7 +234,20 @@ async function makeShot(browser, fmt, opts = {}) {
     now: () => (Date.now() - t0) / 1000,
     async go(hash) {
       await frame.goto(`${BASE}${hash}`, { waitUntil: 'networkidle' });
+      if (opts.focus && fmt === 'desktop') await frame.addStyleTag({ content: FOCUS_CSS });
       await frame.evaluate(() => document.fonts.ready);
+    },
+    /** Put data-broll=<name> on the element around heading text (for scrolling and the camera). */
+    async tag(text, name, levels = 1) {
+      await frame.evaluate(
+        ([text, name, levels]) => {
+          let el = [...document.querySelectorAll('h1,h2,h3')].find((h) => (h.textContent ?? '').includes(text));
+          for (let i = 0; el && i < levels; i++) el = el.parentElement;
+          if (el) el.setAttribute('data-broll', name);
+        },
+        [text, name, levels],
+      );
+      return `[data-broll="${name}"]`;
     },
     async hold(ms) {
       await sleep(ms);
@@ -264,7 +291,7 @@ async function makeShot(browser, fmt, opts = {}) {
       );
     },
     /** Camera: ease the wrapper transform so the union of `sels` fills the frame (with padding). */
-    async cam(sels, ms = 1200, pad = 16, maxZoom = zoomMax) {
+    async cam(sels, ms = 1200, pad = 16, maxZoom = zoomMax, anchor = 'center') {
       const rect = sels
         ? await frame.evaluate(
             ([sels, pad]) => {
@@ -286,6 +313,8 @@ async function makeShot(browser, fmt, opts = {}) {
         z = Math.max(1, Math.min(maxZoom, f.vw / rect.w, f.vh / rect.h));
         cx = rect.l + rect.w / 2;
         cy = rect.t + rect.h / 2;
+        // a panel taller than the window: show its end (where new trace lines appear)
+        if (anchor === 'bottom' && rect.h > f.vh / z) cy = rect.t + rect.h - f.vh / z / 2;
       }
       // keep the visible window inside the iframe
       const hw = f.vw / z / 2;
@@ -354,7 +383,7 @@ async function makeShot(browser, fmt, opts = {}) {
       const y = (box.t + box.h / 2) * k;
       await page.mouse.move(xAt(box.v), y);
       await page.mouse.down();
-      const steps = Math.max(8, Math.round(dur / 40));
+      const steps = Math.max(4, Math.round(dur / 150));
       await page.mouse.move(xAt(clampVt(ms)), y, { steps });
       await page.mouse.up();
       await s.seekExact(ms);
@@ -402,20 +431,21 @@ const SEC = 1000;
 const SHOTS = [
   {
     id: 'landing-headline',
-    storyboard: '2:47–3:00',
+    storyboard: '0:00–0:22 (after the title card) and 2:47–3:00',
     xclip: null,
     speed: 1,
+    vw: 1120,
     desc: 'Landing page: the two-tone headline, then the "Runs on your laptop" clone section.',
     async record(s) {
       await s.go('#/');
       await s.hold(1500);
       s.start();
       s.mark('hero');
-      await s.hold(6000);
+      await s.hold(7000);
       s.mark('scroll');
-      await s.scroll('.closing', 2200, s.mobile ? 120 : 260);
+      await s.scroll('.closing', 2200, s.mobile ? 160 : 220);
       s.mark('closing');
-      await s.hold(8000);
+      await s.hold(9000);
     },
   },
   {
@@ -423,26 +453,30 @@ const SHOTS = [
     storyboard: '0:08–0:22',
     xclip: null,
     speed: 1,
+    vw: 1120,
+    zoom: 1.6,
     desc: 'Results page: the pool scatter (MACE S vs DFT S, hits filled), stepping through the test pools.',
     async record(s) {
       await s.go('#/results');
       await s.frame.waitForSelector('.stats');
-      await s.scroll({ text: 'The cheap simulator, honestly', sel: 'h2' }, 0, 40);
+      const col = await s.tag('The cheap simulator, honestly', 'scatter', 1);
+      await s.scroll(col, 0, s.mobile ? 90 : 120);
+      if (!s.mobile) await s.cam([col], 0, 20);
       await s.hold(1200);
       s.start();
       await s.hold(2500);
-      const pools = s.frame.getByRole('group', { name: 'Pool' }).getByRole('button');
+      const pools = s.frame.locator(`${col} [role=group][aria-label=Pool] button`);
       const n = await pools.count();
-      for (let i = 1; i < Math.min(n, 4); i++) {
-        await pools.nth(i).click();
+      for (let i = 1; i < Math.min(n, 5); i++) {
+        await s.tap(pools.nth(i));
         s.mark(`pool${i + 1}`);
-        await s.hold(2200);
+        await s.hold(2300);
       }
-      if (n) await pools.nth(0).click();
+      if (n) await s.tap(pools.nth(0));
       s.mark('back');
-      await s.hold(4000);
+      await s.hold(4500);
       if (s.mobile) {
-        await s.scroll({ text: 'What the physics can and cannot see', sel: 'h2' }, 1600, 40);
+        await s.scroll({ text: 'What the physics can and cannot see', sel: 'h2' }, 1600, 90);
         s.mark('physics');
         await s.hold(4000);
       }
@@ -453,32 +487,37 @@ const SHOTS = [
     storyboard: '1:40–2:15',
     xclip: '32–40 s',
     speed: 1,
-    desc: 'Results page: arms with intervals and both baselines, discovery curves, pre-registered tests, Brier, leak probe and claims.',
+    vw: 1120,
+    desc: 'Results page: arms with intervals and both baselines, discovery curves, pre-registered tests, Brier, leak probe and claims, ceilings.',
     async record(s) {
+      const off = s.mobile ? 90 : 100;
       await s.go('#/results');
       await s.frame.waitForSelector('.stats');
       await s.hold(1200);
       s.start();
-      await s.hold(2500);
-      await s.scroll({ text: 'Hits at 40 lookups, by arm', sel: 'h2' }, 1600, 48);
+      await s.hold(3000);
+      await s.scroll({ text: 'Hits at 40 lookups, by arm', sel: 'h2' }, 1600, off);
       s.mark('arms');
-      await s.hold(s.mobile ? 5000 : 7000);
+      await s.hold(s.mobile ? 5500 : 8000);
       if (s.mobile) {
-        await s.scroll({ text: 'Discovery curves', sel: 'h2' }, 1400, 48);
+        await s.scroll({ text: 'Discovery curves', sel: 'h2' }, 1400, off);
         s.mark('curves');
         await s.hold(5000);
       }
-      await s.scroll({ text: 'Pre-registered tests', sel: 'h2' }, 1600, 48);
+      await s.scroll({ text: 'Pre-registered tests', sel: 'h2' }, 1600, off);
       s.mark('tests');
-      await s.hold(6000);
-      await s.scroll({ text: 'Does it know what it knows?', sel: 'h2' }, 1600, 48);
+      await s.hold(6500);
+      await s.scroll({ text: 'Does it know what it knows?', sel: 'h2' }, 1600, off);
       s.mark('brier');
-      await s.hold(s.mobile ? 4000 : 7000);
+      await s.hold(s.mobile ? 4500 : 7000);
       if (s.mobile) {
-        await s.scroll({ text: 'Vision, leakage, claims', sel: 'h2' }, 1400, 48);
+        await s.scroll({ text: 'Vision, leakage, claims', sel: 'h2' }, 1400, off);
         s.mark('leak');
         await s.hold(5000);
       }
+      await s.scroll({ text: 'Ceilings per pool', sel: 'h2' }, 1600, off);
+      s.mark('ceilings');
+      await s.hold(6000);
     },
   },
   {
@@ -487,23 +526,24 @@ const SHOTS = [
     xclip: null,
     speed: 1,
     zoom: 2.2,
-    desc: "Console replay at 1x: the Director's parallel tool calls land in the trace.",
+    focus: true,
+    desc: "Console replay at 1x: the Director's reasoning and its parallel tool calls land in the trace.",
     async record(s) {
       await s.go(consoleHash('paused=1&speed=8'));
       await s.consoleReady();
       await s.seekExact(M.start1x);
       await s.hold(800);
       s.start();
-      await s.hold(600);
+      await s.hold(700);
       await s.speed(1);
-      await s.hold(400);
+      await s.hold(500);
       await s.play();
       s.mark('play');
       await s.hold(1800);
       if (s.mobile) await s.scroll('.c-tabs', 1400, 8);
-      else await s.cam(['.c-tabs'], 1400, 12);
+      else await s.cam(['.c-tabs'], 1400, 12, 1.9, 'bottom');
       s.mark('close');
-      await s.hold(10500);
+      await s.hold(11000);
     },
   },
   {
@@ -511,7 +551,7 @@ const SHOTS = [
     storyboard: '0:46–1:05',
     xclip: '10–22 s',
     speed: 8,
-    desc: 'Console replay at 8x (label visible in the top bar): proposals with P(hit), the Critic, the batch bought, sealed cells reveal.',
+    desc: 'Console replay at 8x (the top bar says so): proposals with P(hit), the Critic, the batch bought, sealed cells reveal.',
     async record(s) {
       const from = clampVt(M.start1x + 10 * SEC);
       const to = hasEvent(M.firstHit) ? vt(M.firstHit) + 3 * SEC : from + 200 * SEC;
@@ -542,17 +582,16 @@ const SHOTS = [
     storyboard: '0:58–1:05',
     xclip: null,
     speed: 1,
-    zoom: 3,
+    zoom: 2.4,
+    focus: true,
     skipIf: () => !hasEvent(M.veto) && 'run has no critique',
-    desc: 'The Critic reads the render and vetoes a pick (close-up on the trace), then the vetoed row in the table.',
+    desc: 'The Critic reads the render and vetoes a pick (close-up on the trace).',
     async record(s) {
-      const c = EVENTS[M.veto];
-      const vetoId = c.payload?.vetoes?.[0]?.id;
       await s.go(consoleHash('paused=1&speed=1'));
       await s.consoleReady();
       await s.seekExact(vt(M.veto) - 4500);
       if (s.mobile) await s.scroll('.c-tabs', 0, 8);
-      else await s.cam(['.c-tabs'], 0, 10);
+      else await s.cam(['.c-tabs'], 0, 10, 1.9, 'bottom');
       await s.hold(1500);
       s.start();
       await s.hold(500);
@@ -561,19 +600,7 @@ const SHOTS = [
       await s.hold(6500);
       s.mark('veto');
       await s.pause();
-      await s.hold(1500);
-      if (vetoId) {
-        const row = s.frame.locator('.cand-table tbody tr', { hasText: vetoId }).first();
-        if (s.mobile) {
-          await s.scroll('.c-center', 1400, 8);
-          await row.scrollIntoViewIfNeeded().catch(() => undefined);
-        } else {
-          await s.cam(['.cand-table'], 1200, 8, 1.6);
-        }
-        await s.tap(row).catch(() => undefined);
-        s.mark('row');
-        await s.hold(3500);
-      }
+      await s.hold(5500);
     },
   },
   {
@@ -618,34 +645,28 @@ const SHOTS = [
     storyboard: '1:15–1:40',
     xclip: '22–32 s',
     speed: 1,
-    zoom: 3,
+    zoom: 2.4,
+    focus: true,
     skipIf: () => !hasEvent(M.cal) && 'run has no calibration event',
-    desc: "calibrate_oracle: the parity plot appears in the trace, the Director's next line, then the Critic's visual rho (scrubber seeks between them).",
+    desc: "calibrate_oracle: the parity plot lands in the trace, then (seeking ahead) the Director's next line and the Critic's visual rho.",
     async record(s) {
       await s.go(consoleHash('paused=1&speed=1'));
       await s.consoleReady();
       await s.seekExact(vt(M.calCall) - 1500);
       if (s.mobile) await s.scroll('.c-tabs', 0, 8);
+      else await s.cam(['.c-tabs'], 0, 10, 1.9, 'bottom');
       await s.hold(1500);
       s.start();
       await s.hold(400);
       await s.play();
       s.mark('play');
-      if (!s.mobile) await s.cam(['.c-tabs'], 1400, 10);
-      await s.hold(5600);
+      await s.hold(6500);
       s.mark('plot');
-      const later = [M.calNext, M.calCrit].filter((i) => i > M.cal);
-      for (const i of later) {
-        // the scrubber is in the top bar: step out of the close-up, drag it, step back in
-        if (!s.mobile) await s.cam(null, 700);
-        else await s.scroll(0, 900, 0);
-        await s.pause();
-        await s.seekDrag(vt(i) - 1200);
-        await s.play();
-        if (!s.mobile) await s.cam(['.c-tabs'], 900, 10);
-        else await s.scroll('.c-tabs', 900, 8);
+      await s.hold(1500);
+      for (const i of [M.calNext, M.calCrit].filter((i) => i > M.cal)) {
+        await s.seekExact(vt(i) - 1000);
         s.mark(EVENTS[i].kind === 'critique' ? 'critic' : 'next');
-        await s.hold(5500);
+        await s.hold(6500);
       }
       await s.pause();
       await s.hold(1500);
@@ -656,23 +677,27 @@ const SHOTS = [
     storyboard: '2:15–2:30',
     xclip: null,
     speed: 1,
-    zoom: 3,
+    zoom: 2.4,
+    focus: true,
     skipIf: () => !hasEvent(M.claim) && 'run has no claimcheck event',
-    desc: 'The report lands, then the claim checker: claims, verified, flagged (in red).',
+    desc: 'The scrubber is dragged to the end of the run; the report lands, then the claim checker: claims, verified, flagged (in red).',
     async record(s) {
+      const target = vt(hasEvent(M.report) ? M.report : M.claim) - 2500;
       await s.go(consoleHash('paused=1&speed=1'));
       await s.consoleReady();
-      await s.seekExact(vt(hasEvent(M.report) ? M.report : M.claim) - 2500);
+      await s.seekExact(Math.max(0, target - 120 * SEC));
       await s.hold(800);
       s.start();
-      await s.hold(500);
+      await s.hold(800);
+      await s.seekDrag(target, 900);
+      s.mark('seek');
       await s.play();
       s.mark('play');
-      await s.hold(3500);
+      await s.hold(2500);
       if (s.mobile) await s.scroll('.c-tabs', 1400, 8);
-      else await s.cam(['.c-tabs'], 1400, 10);
+      else await s.cam(['.c-tabs'], 1400, 10, 1.9, 'bottom');
       s.mark('claims');
-      await s.hold(9000);
+      await s.hold(10000);
     },
   },
   {
@@ -680,7 +705,8 @@ const SHOTS = [
     storyboard: '2:30–2:47',
     xclip: null,
     speed: 1,
-    zoom: 3,
+    zoom: 2.4,
+    focus: true,
     skipIf: () => !hasEvent(M.openBatch) && 'run has no proposal before a human gate',
     desc: 'The approval queue on an open batch: move with j, approve with a. Proposed mutants (unvalidated, ML only) when the run has any.',
     async record(s) {
@@ -688,31 +714,29 @@ const SHOTS = [
       await s.consoleReady();
       await s.tab('Queue');
       if (s.mobile) await s.scroll('.c-tabs', 0, 8);
-      else await s.cam(['.c-tabs'], 0, 10);
+      else await s.cam(['.c-tabs'], 0, 10, 1.9, 'bottom');
       await s.hold(1500);
       s.start();
       await s.hold(1500);
       await s.frame.locator('.q-list').focus();
       for (let i = 0; i < 3; i++) {
         await s.page.keyboard.press('j');
-        await s.hold(900);
+        await s.hold(1000);
       }
       s.mark('approve');
       await s.page.keyboard.press('a');
-      await s.hold(3500);
+      await s.hold(4000);
       if (M.mutations) {
-        if (!s.mobile) await s.cam(null, 700);
-        await s.seekDrag(TOTAL);
+        await s.seekExact(TOTAL);
         await s.tab('Queue');
-        if (!s.mobile) await s.cam(['.c-tabs'], 900, 10);
         s.mark('mutants');
         await s.hold(6000);
       } else {
-        // no mutants in this run: show the structure of the approved batch's first pick
-        if (!s.mobile) await s.cam(['.viewer-host'], 1200, 10, 2.2);
+        // no mutants in this run: the structure of the batch's current pick
+        if (!s.mobile) await s.cam(['.viewer-host'], 1200, 10);
         else await s.scroll('.viewer-host', 1200, 150);
         s.mark('structure');
-        await s.hold(5000);
+        await s.hold(6000);
       }
     },
   },
@@ -721,7 +745,8 @@ const SHOTS = [
     storyboard: '0:22–0:38 (stand-in until live.mov)',
     xclip: null,
     speed: 1,
-    zoom: 3,
+    zoom: 2.4,
+    focus: true,
     desc: 'Model tab of the finished run: GGUF hash, quant, llama.cpp build, tok/s, network. Used only when live.mov is missing.',
     async record(s) {
       await s.go(consoleHash(`paused=1&speed=1&seq=${EVENTS[M.last].seq}`));
@@ -731,9 +756,9 @@ const SHOTS = [
       await s.hold(1200);
       s.start();
       await s.hold(1500);
-      if (!s.mobile) await s.cam(['.c-tabs'], 1600, 10);
+      if (!s.mobile) await s.cam(['.c-tabs'], 1600, 10, 1.9, 'bottom');
       s.mark('close');
-      await s.hold(12000);
+      await s.hold(14000);
     },
   },
 ];
@@ -786,7 +811,7 @@ for (const shot of SHOTS) {
   delete entry.skipped;
   for (const fmt of fmts) {
     const t = Date.now();
-    const s = await makeShot(browser, fmt, { zoom: shot.zoom });
+    const s = await makeShot(browser, fmt, { zoom: shot.zoom, vw: shot.vw, focus: shot.focus });
     let result;
     try {
       await shot.record(s);

@@ -84,8 +84,10 @@ FFMPEG="${FFMPEG:-}"
 if [ -z "$FFMPEG" ]; then
   # Homebrew's slim ffmpeg may lack drawtext/libass; ffmpeg-full has both.
   for c in ffmpeg /opt/homebrew/opt/ffmpeg-full/bin/ffmpeg /usr/local/opt/ffmpeg-full/bin/ffmpeg; do
-    if command -v "$c" >/dev/null 2>&1 && "$c" -hide_banner -filters 2>/dev/null | grep -q ' drawtext ' \
-       && "$c" -hide_banner -filters 2>/dev/null | grep -q ' ass '; then FFMPEG="$c"; break; fi
+    command -v "$c" >/dev/null 2>&1 || continue
+    filters="$("$c" -hide_banner -filters 2>/dev/null || true)"
+    case "$filters" in *" drawtext "*) ;; *) continue ;; esac
+    case "$filters" in *" ass "*) FFMPEG="$c"; break ;; esac
   done
 fi
 [ -n "$FFMPEG" ] || die "no ffmpeg with the drawtext and ass filters (needs freetype and libass)" \
@@ -95,7 +97,7 @@ FFPROBE="${FFPROBE:-$(dirname "$(command -v "$FFMPEG")")/ffprobe}"
 [ -n "$FFPROBE" ] || die "ffprobe not found" "brew install ffmpeg-full"
 command -v "$PY" >/dev/null 2>&1 || die "python3 not found" "xcode-select --install"
 export FFMPEG FFPROBE
-"$FFMPEG" -hide_banner -encoders 2>/dev/null | grep -q libx264 || die "this ffmpeg has no libx264 encoder" "brew install ffmpeg-full"
+case "$("$FFMPEG" -hide_banner -encoders 2>/dev/null || true)" in *libx264*) ;; *) false ;; esac || die "this ffmpeg has no libx264 encoder" "brew install ffmpeg-full"
 
 # ---------------------------------------------------------------------------------------------- fonts
 FONTS="$MEDIA/fonts"
