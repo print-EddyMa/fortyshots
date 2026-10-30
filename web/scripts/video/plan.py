@@ -124,6 +124,17 @@ class Plan:
             parts.append(f"enable='{enable}'")
         return "drawtext=" + ":".join(parts)
 
+    def two_tone(self, left: str, right: str, x: int, y: int, size: int, enable: str) -> list[str]:
+        """White + grey text on one opaque background-coloured plate (drawbox, so both halves share it)."""
+        adv = self.a.advance * size
+        text_w = int(len(f"{left} {right}") * adv)
+        padx, top, bottom = int(size * 0.6), int(size * 0.05), int(size * 1.45)
+        out = [f"drawbox=x={x - padx}:y={y + top - int(size * 0.35)}:w={text_w + 2 * padx}:h={bottom - top + int(size * 0.35)}:color={BG}@1:t=fill:enable='{enable}'"]
+        out.append(self.drawtext(left, x, y, size, FG, enable=enable))
+        if right:
+            out.append(self.drawtext(right, x + int(len(left + " ") * adv), y, size, MUTED, enable=enable))
+        return out
+
     def speed_label(self, factor: float) -> str:
         txt = f"{int(round(factor))}× speed" if abs(factor - round(factor)) < 0.05 else f"{factor:.1f}× speed"
         size = 30 if not self.vertical else 34
@@ -251,7 +262,7 @@ class Plan:
         margin = 96 if self.vertical else 160
         adv = self.a.advance
         if self.vertical:
-            size = 60
+            size = 68
             width_chars = int((W - 2 * margin) / (adv * size))
             laid = []
             for text, color in lines:
@@ -386,7 +397,7 @@ class Plan:
             if b <= skip_before:
                 continue
             cues.append((max(a, skip_before), b, " ".join(ls[2:])))
-        size = 46 if self.vertical else 40
+        size = 52 if self.vertical else 40
         margin_v = 300 if self.vertical else 56
         side = 72 if self.vertical else 160
         width_chars = int((self.W - 2 * side) / (self.a.advance * size))
@@ -432,16 +443,12 @@ class Plan:
             size = 30
             x, y = 96, self.H - 56 - 2 * 40 - 120
             en = f"between(t,{last[0] + 0.4:.2f},{last[1]:.2f})"
-            vf.append(self.drawtext(left, x, y, size, FG, box=True, enable=en))
-            if right:
-                x2 = x + int(len(left + " ") * a.advance * size)
-                vf.append(self.drawtext("· " + right, x2, y, size, MUTED, box=True, enable=en))
+            vf += self.two_tone(left, ("· " + right) if right else "", x, y, size, en)
         for s0, s1 in self.live_spans:
             size = 30
             x, y = 96, 72
             en = f"between(t,{s0 + 0.3:.2f},{s1:.2f})"
-            vf.append(self.drawtext(LIVE_NOTE[0], x, y, size, FG, box=True, enable=en))
-            vf.append(self.drawtext(LIVE_NOTE[1], x + int((len(LIVE_NOTE[0]) + 1) * a.advance * size), y, size, MUTED, box=True, enable=en))
+            vf += self.two_tone(LIVE_NOTE[0], LIVE_NOTE[1], x, y, size, en)
         if a.captions == "burn":
             srt = Path(self.tl["srt"]["x_clip" if self.vertical else "main"])
             skip = 0.0
