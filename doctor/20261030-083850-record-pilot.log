@@ -16,3 +16,13 @@ start A5-P0-s1-202610301403
 [lab] a campaign finished; pushing it: pushed: 15 new or changed item(s) to branch runs-mac (d6b475d)
 {"run_id": "A5-P0-s1-202610301403", "hits": 1, "spent": 40, "duration_s": 6001.6, "aborted": false}
 start A5-P0-s2-202610301544
+
+[lab] a campaign finished; pushing it: pushed: 16 new or changed item(s) to branch runs-mac (3a0c062)
+
+==> Plan 'pilot' summary
+        A5-P0-s0-202610301238              0/40 hits/lookups  85.1 min
+        A5-P0-s1-202610301403              1/40 hits/lookups  100.0 min
+        A5-P0-s2-202610301544              not finished
+        swap growth during the plan: 1.60 GB; network now: on
+  ok    Stopped model server (pid 90545)
+  warn  Stopped by Ctrl-C. Resume later with: ./lab record pilot
