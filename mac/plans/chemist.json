@@ -1,0 +1,27 @@
+{
+  "name": "chemist",
+  "description": "Prospective mode demo (Push the Frontier). A5 on the dev pool P0 at seeds 90-92 with the Chemist on: after each campaign it proposes mutation specs on the best bought MOFs. The container then builds, relaxes, checks and ranks them (physics/prospective.py). Never touches a test pool and never enters a benchmark number.",
+  "defaults": {
+    "chemist": true
+  },
+  "runs": [
+    {
+      "arm": "A5",
+      "pool": "P0",
+      "seed": 90,
+      "chemist": true
+    },
+    {
+      "arm": "A5",
+      "pool": "P0",
+      "seed": 91,
+      "chemist": true
+    },
+    {
+      "arm": "A5",
+      "pool": "P0",
+      "seed": 92,
+      "chemist": true
+    }
+  ]
+}

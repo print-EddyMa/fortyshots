@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from . import attest, claimcheck
+from . import chemist as chem
 from .cassette import Cassette
 from .config import BATCH, BUDGET, DEFAULT_BASE_URL, DEFAULT_MAX_MINUTES, GOAL, MAX_DIRECTOR_CALLS, ROUNDS
 from .data import load_id_map
@@ -416,6 +417,7 @@ class Campaign:
             "prereg_sha": attest.prereg_sha(), "git_sha": attest.git_sha(),
             "config": {"action_mode": self.cfg.action_mode, "vision": self.cfg.vision,
                        "shared_tools": self.cfg.shared_tools, "max_minutes": self.cfg.max_minutes,
+                       "chemist": self.cfg.chemist,
                        "max_director_calls": self.cfg.max_calls, "strengths": self.cfg.strengths,
                        "tools": self.env.tools, "cassette": self.client.cassette.mode,
                        "llm": {"timeout_floor_s": self.client.timeout, "decode_tps": self.client.decode_tps,
@@ -794,22 +796,32 @@ class Campaign:
         self.emit("claimcheck", "system", cc)
 
     def chemist(self):
-        hits = [i for i in self.env.order if self.env.bought[i]["hit"]] or sorted(
-            self.env.order, key=lambda i: self.env.bought[i]["S"])[:3]
-        parents = [i for i in hits if int(self.env.by_id.at[i, "natoms"]) <= 120][:5]
-        if not parents:
+        """Prospective mode: mutation specs on the best bought MOFs. Only specs physics/mutate.py can execute are
+        logged (status "proposed"); physics/prospective.py builds them later, outside the ledger."""
+        env = self.env
+        parents = chem.choose_parents(env.bought, env.order, env.by_id["natoms"].to_dict())
+        opts = chem.options(parents, env.by_id["metals"].to_dict(), self.cfg.data_dir)
+        if not opts:
             return
-        rows = "\n".join(f"{i} {self.env.by_id.at[i, 'formula']} {self.env.by_id.at[i, 'metals']} "
-                         f"{self.env.bought[i]['S']} {'HIT' if self.env.bought[i]['hit'] else '-'}" for i in parents)
-        msgs = [self.system_msg(self.n_rounds), {"role": "user", "content": P.CHEMIST.format(parents=rows)}]
+        rows = [f"{i} {env.by_id.at[i, 'formula']} {env.by_id.at[i, 'metals']} {env.bought[i]['S']} "
+                f"{'HIT' if env.bought[i]['hit'] else '-'}" for i in opts]
+        prompt = P.CHEMIST.format(parents=chem.describe(rows, opts), n=chem.MAX_MUTATIONS)
+        msgs = [self.system_msg(self.n_rounds), {"role": "user", "content": prompt}]
         try:
-            res, cid = self.llm_call("chemist", msgs, schema=("Mutations", mutations_schema(parents)))
+            res, cid = self.llm_call("chemist", msgs, schema=("Mutations", mutations_schema(opts, chem.MAX_MUTATIONS)))
             muts = Mutations.model_validate_json(_strip_fences(res.content)).mutations
         except (ValidationError, CampaignStop) as e:
             self.error("chemist", (str(e).splitlines() or [type(e).__name__])[0][:300], recovered=False)
             return
+        seen = set()
         for m in muts:
-            spec = m.model_dump(exclude={"parent", "rationale"})
+            why = chem.check(m, opts)
+            spec = chem.to_spec(m)
+            key = json.dumps([m.parent, spec], sort_keys=True)
+            if why or key in seen:
+                self.error("chemist", f"mutation skipped: {why or 'duplicate spec'}", recovered=True, call_id=cid)
+                continue
+            seen.add(key)
             self.emit("mutation", "chemist", {"parent": m.parent, "spec": spec, "status": "proposed",
                                               "note": m.rationale}, call_id=cid)
 

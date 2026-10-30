@@ -1,14 +1,17 @@
 """Prospective mode: build, MACE-relax and check mutants proposed by the Chemist (container only).
 
 Input: a JSON list of mutation specs, e.g. the `mutation` event payloads of a run:
-  {"parent": "m3fa9c2e", "spec": {"op": "functionalize", "group": "NH2", "site": 0}}
-      group in NH2 | OH | F | CH3; site indexes the parent's aromatic C-H sites (default 0)
+  {"parent": "m3fa9c2e", "spec": {"op": "functionalize", "group": "NH2", "site": "near_co2"}}
+      group in NH2 | OH | F | CH3; site is a descriptor (near_co2: the aromatic H closest to the carbon of the
+      parent's best MACE CO2 placement; near_metal / far_from_metal: smallest / largest distance to any metal
+      atom; ties go to the lower index) or an integer index into the parent's aromatic C-H sites (default 0)
   {"parent": "m3fa9c2e", "spec": {"op": "swap_metal", "from": "Zn", "to": "Mg"}}
       charge-preserving families only: Mg Zn Co Ni (2+), Al Fe Sc (3+)
-Parents must have <= 120 framework atoms.
+Parents must have <= 120 framework atoms. physics/prospective.py is the per-run driver; this CLI takes a raw list.
 
 For each spec: build the mutant from the parent's ODAC initial framework, relax cell and positions with
-MACE-MP-0 medium (float64, FIRE + FrechetCellFilter, fmax 0.05 eV/A, <= 300 steps), run physics/validity.py,
+MACE-MP-0 medium (float32 as the cache, FIRE + FrechetCellFilter, fmax 0.05 eV/A, <= 300 steps), run
+physics/validity.py,
 and compute MACE binding (float32, as the cache) with CO2/H2O at the parent's best MACE placements carried
 over in fractional coordinates. Results are "unvalidated, ML only" and never enter a benchmark number.
 
@@ -38,6 +41,7 @@ MAX_PARENT_ATOMS = 120
 FMAX = 0.05
 MAX_FRAMES = 30
 GROUPS = ("NH2", "OH", "F", "CH3")
+SITES = ("near_co2", "near_metal", "far_from_metal")
 SWAP_FAMILIES = ({"Mg", "Zn", "Co", "Ni"}, {"Al", "Fe", "Sc"})
 LABEL = "unvalidated · ML only"
 
@@ -108,19 +112,73 @@ def swap_metal(a, old, new):
     return b
 
 
-def build(parent, spec):
-    """Return (mutant atoms, tag) or raise ValueError with a reason."""
+def metal_indices(a):
+    from pymatgen.core import Element
+    syms = a.get_chemical_symbols()
+    metal = {x for x in set(syms) if Element(x).is_metal}
+    return [i for i, x in enumerate(syms) if x in metal]
+
+
+def resolve_site(a, sites, site, co2_pos=None):
+    """Index into `sites` (aromatic C-H list) for an integer site or a SITES descriptor; ValueError if impossible."""
+    from ase.geometry import get_distances
+    if isinstance(site, (int, np.integer)) or (isinstance(site, str) and site.isdigit()):
+        k = int(site)
+        if not 0 <= k < len(sites):
+            raise ValueError(f"site {k} out of range (parent has {len(sites)} aromatic C-H sites)")
+        return k
+    if site not in SITES:
+        raise ValueError(f"site must be an index or one of {SITES}")
+    hpos = a.positions[[h for h, _ in sites]]
+    if site == "near_co2":
+        if co2_pos is None:
+            raise ValueError("near_co2 needs the parent's best MACE CO2 placement")
+        targets = np.asarray(co2_pos, float)[:1]  # carbon first (CONTRACTS addenda)
+    else:
+        idx = metal_indices(a)
+        if not idx:
+            raise ValueError("parent has no metal atom")
+        targets = a.positions[idx]
+    _, d = get_distances(hpos, targets, cell=a.cell, pbc=True)
+    dmin = d.min(axis=1)
+    return int(np.argmax(dmin)) if site == "far_from_metal" else int(np.argmin(dmin))
+
+
+def normalize(spec, parent_symbols=()):
+    """Builder spec from any Chemist spec, including the first schema ({kind: functionalize|metal_swap, site: free
+    text, group, new_metal}); ValueError when it cannot be made executable."""
+    s = dict(spec or {})
+    op = s.get("op") or {"metal_swap": "swap_metal"}.get(s.get("kind"), s.get("kind"))
+    if op == "functionalize":
+        site = s.get("site", 0)
+        if isinstance(site, str) and site not in SITES and not site.isdigit():
+            site = "near_co2"  # free text such as "aromatic C-H"
+        return {"op": op, "group": s.get("group"), "site": site}
+    if op == "swap_metal":
+        new = s.get("to") or s.get("new_metal")
+        old = s.get("from")
+        if not old:
+            fam = next((f for f in SWAP_FAMILIES if new in f), set())
+            cands = sorted({x for x in parent_symbols if x in fam and x != new})
+            if len(cands) != 1:
+                raise ValueError(f"swap to {new} does not say which metal it replaces")
+            old = cands[0]
+        return {"op": op, "from": old, "to": new}
+    raise ValueError(f"unknown op {op}")
+
+
+def build(parent, spec, co2_pos=None):
+    """Return (mutant atoms, tag) or raise ValueError with a reason. The tag names the resolved site, so two
+    descriptors that pick the same C-H give the same mutant id."""
     op = spec.get("op")
     if op == "functionalize":
         group = spec.get("group")
         if group not in GROUPS:
             raise ValueError(f"group must be one of {GROUPS}")
         sites = aromatic_ch_sites(parent)
-        k = int(spec.get("site", 0))
         if not sites:
             raise ValueError("parent has no aromatic C-H site")
-        if not 0 <= k < len(sites):
-            raise ValueError(f"site {k} out of range (parent has {len(sites)} aromatic C-H sites)")
+        k = resolve_site(parent, sites, spec.get("site", 0), co2_pos)
         return functionalize(parent, *sites[k], group), f"{group}s{k}"
     if op == "swap_metal":
         old, new = spec.get("from"), spec.get("to")
@@ -206,7 +264,6 @@ def main():
         specs = json.load(fh)
     frames = load_frames(a.frames)
     cache = pd.read_parquet(a.mace).set_index("id")
-    calc64 = mace_mp(model="medium", device="cpu", default_dtype="float64", dispersion=False)
     calc32 = mace_mp(model="medium", device="cpu", default_dtype="float32", dispersion=False)
     gas_e = gas_energies(calc32)
     os.makedirs(a.out_dir, exist_ok=True)
@@ -221,14 +278,16 @@ def main():
             if len(pm["numbers"]) > MAX_PARENT_ATOMS:
                 raise ValueError(f"parent has {len(pm['numbers'])} > {MAX_PARENT_ATOMS} atoms")
             parent = parent_atoms(pm)
-            built, tag = build(parent, spec)
+            co2 = json.loads(cache.at[pid, "co2_best_ads_pos"]) if pid in cache.index else None
+            spec = normalize(spec, parent.get_chemical_symbols())
+            built, tag = build(parent, spec, co2)
         except ValueError as e:
             rows.append({**row, "status": "rejected", "note": str(e)})
             print(json.dumps(rows[-1]), flush=True)
             continue
         mid = f"{pid}-{tag}"
         t0 = time.time()
-        relaxed, traj, fmax, steps = relax(built, calc64, steps=a.steps)
+        relaxed, traj, fmax, steps = relax(built, calc32, steps=a.steps)
         checks = validity_report(parent, relaxed, spec, fmax, FMAX, steps, a.steps)
         mace = None
         if pid in cache.index:

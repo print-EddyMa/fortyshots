@@ -26,7 +26,7 @@ def _static_texts() -> dict[str, str]:
     ids, cids = ["m0000000", "m1111111"], ["c0001"]
     for name, js in [("batch", S.batch_schema(2, ids, cids)), ("review", S.review_schema(ids, cids)),
                      ("steps", S.steps_schema(list(TOOL_SPECS)[:6], 4)), ("scores", S.scores_schema(ids)),
-                     ("mutations", S.mutations_schema(ids))]:
+                     ("mutations", S.mutations_schema({i: {"sites": 4, "swaps": {"Zn": ["Mg", "Co", "Ni"]}} for i in ids}))]:
         texts[f"schema {name}"] = json.dumps(js)
     for f in ROLES_DIR.glob("*.py"):
         texts[f"source {f.name}"] = f.read_text().split('"""', 2)[-1] if f.name == "prompts.py" else f.read_text()

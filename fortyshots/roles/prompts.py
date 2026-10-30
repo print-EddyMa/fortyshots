@@ -92,10 +92,14 @@ EVIDENCE
 {evidence}"""
 
 CHEMIST = """ROLE: Chemist.
-Suggest at most 3 new candidate structures derived from the parents below, each either functionalize (add NH2, OH, \
-F or CH3 at an aromatic C-H site) or metal_swap (charge-preserving: Mg, Zn, Co, Ni interchange; Al, Fe, Sc \
-interchange). Give a one-sentence rationale each. These will be checked by simulation only. Reply with JSON only.
-PARENTS (id, formula, metals, DFT S, hit)
+Suggest at most {n} new candidate structures derived from the parents below. Each is one edit of one parent:
+- functionalize: replace one aromatic C-H hydrogen by NH2, OH, F or CH3. Pick the site by where it sits: near_co2 \
+(the C-H closest to the CO2 binding pocket), near_metal (closest to a metal atom) or far_from_metal. Only parents \
+with aromatic C-H sites can be functionalized.
+- swap_metal: replace every atom of one metal by a metal of the same charge family (Mg, Zn, Co, Ni interchange; \
+Al, Fe, Sc interchange). Only the swaps listed for a parent are possible.
+Give a one-sentence rationale each. These will be checked by simulation only. Reply with JSON only.
+PARENTS (id, formula, metals, DFT S, hit | what each parent allows)
 {parents}"""
 
 PROBE_SYSTEM = "You are a careful chemist. Answer from what you already know."

@@ -58,6 +58,9 @@ def test_server_args_refuse_tight_drafter(tmp_path):
     assert out.returncode != 0 and "headroom" in out.stderr
 
 
+DEV_PLANS = {"pilot", "chemist"}  # chemist: prospective-mode demo, A5 on P0 at seeds 90+
+
+
 def test_plans():
     arms = {"A4", "A5", "A6", "L", "L2"}
     pools = {f"P{i}" for i in range(6)}
@@ -70,7 +73,9 @@ def test_plans():
             assert r["arm"] in arms and r["pool"] in pools and isinstance(r["seed"], int), (name, r)
         keys = [(r["arm"], r["pool"], r["seed"]) for r in runs]
         assert len(keys) == len(set(keys)), f"{name} repeats a run"
-        if name != "pilot":
+        if name in DEV_PLANS:  # dev-pool plans never touch a test pool
+            assert all(r["pool"] == "P0" for r in runs), f"{name} must use the dev pool only"
+        else:
             assert all(r["pool"] != "P0" for r in runs), f"{name} must not use the dev pool"
     assert {(r["arm"], r["pool"]) for r in plans["pilot"]["runs"]} == {("A5", "P0")}
     main = plans["main"]["runs"]

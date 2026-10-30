@@ -283,11 +283,26 @@ class Policy:
         return {"content": json.dumps({"scores": out}), "reasoning": self.reasoning(f"Scoring {len(keys)} items.")}
 
     def mutations(self) -> dict:
-        parents = self.schema["properties"]["mutations"]["items"]["properties"]["parent"].get("enum") or []
-        muts = [{"parent": p, "kind": "functionalize", "site": "aromatic C-H", "group": self.rng.choice(["NH2", "OH"]),
-                 "new_metal": "", "rationale": "An amine or hydroxyl near the metal site can add a CO2 anchor."}
-                for p in parents[:2]]
-        return {"content": json.dumps({"mutations": muts}), "reasoning": self.reasoning("Two functionalizations.")}
+        """Functionalizations of the first three offered parents (NH2 or OH near the CO2 pocket, F far from the
+        metal, CH3 near the metal) and one metal swap when the schema offers any: specs the builder can execute."""
+        variants = self.schema["properties"]["mutations"]["items"].get("anyOf") or []
+        func = next((v["properties"] for v in variants if v["properties"]["op"].get("const") == "functionalize"), None)
+        swaps = [v["properties"] for v in variants if v["properties"]["op"].get("const") == "swap_metal"]
+        muts = []
+        why = {"NH2": "An amine near the CO2 pocket can add a Lewis-base anchor for CO2.",
+               "OH": "A hydroxyl near the CO2 pocket can hydrogen-bond the CO2 oxygen.",
+               "F": "A fluorine far from the metal tunes the linker polarity without blocking the metal site.",
+               "CH3": "A methyl next to the metal narrows the pore around the open site."}
+        plan = [(self.rng.choice(["NH2", "OH"]), "near_co2"), ("F", "far_from_metal"), ("CH3", "near_metal")]
+        for p, (group, site) in zip((func or {}).get("parent", {}).get("enum", []), plan):
+            muts.append({"parent": p, "op": "functionalize", "group": group, "site": site, "rationale": why[group]})
+        if swaps:
+            v = swaps[0]
+            muts.append({"parent": v["parent"]["const"], "op": "swap_metal", "from_metal": v["from_metal"]["const"],
+                         "to_metal": v["to_metal"]["enum"][0],
+                         "rationale": "A same-charge metal swap keeps the topology and changes the metal-CO2 affinity."})
+        return {"content": json.dumps({"mutations": muts}),
+                "reasoning": self.reasoning(f"{len(muts)} edits the builder can execute.")}
 
     def doctor_vision(self) -> dict:
         imgs = [b for m in self.messages for b in _images(m)]

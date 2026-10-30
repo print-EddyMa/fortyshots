@@ -48,16 +48,18 @@ class Scores(BaseModel):
 
 
 class Mutation(BaseModel):
+    """One Chemist proposal; fortyshots.chemist.to_spec turns it into the physics/mutate.py spec."""
     parent: str
-    kind: str
-    site: str = ""
+    op: str
     group: str = ""
-    new_metal: str = ""
+    site: str = ""
+    from_metal: str = ""
+    to_metal: str = ""
     rationale: str = ""
 
 
 class Mutations(BaseModel):
-    mutations: list[Mutation] = Field(default=[], max_length=3)
+    mutations: list[Mutation] = Field(default=[], max_length=5)
 
 
 def _strs(enum: list[str] | None = None, max_items: int | None = None) -> dict:
@@ -96,9 +98,24 @@ def scores_schema(keys: list[str]) -> dict:
     return _obj({"scores": {"type": "array", "items": item, "minItems": len(keys), "maxItems": len(keys)}})
 
 
-def mutations_schema(parents: list[str]) -> dict:
-    m = _obj({"parent": {"type": "string", "enum": parents},
-              "kind": {"type": "string", "enum": ["functionalize", "metal_swap"]},
-              "site": {"type": "string"}, "group": {"type": "string", "enum": ["NH2", "OH", "F", "CH3", ""]},
-              "new_metal": {"type": "string"}, "rationale": {"type": "string", "maxLength": 240}})
-    return _obj({"mutations": {"type": "array", "items": m, "maxItems": 3}})
+def mutations_schema(options: dict, max_items: int = 5) -> dict:
+    """options: fortyshots.chemist.options(); one anyOf variant for functionalize (parents with aromatic C-H sites,
+    or unknown) and one per (parent, swappable metal), so only executable specs can be written."""
+    from ..chemist import GROUPS, SITES
+
+    variants = []
+    func = [p for p, o in options.items() if o["sites"] is None or o["sites"] > 0]
+    if func:
+        variants.append(_obj({"parent": {"type": "string", "enum": func},
+                              "op": {"type": "string", "const": "functionalize"},
+                              "group": {"type": "string", "enum": list(GROUPS)},
+                              "site": {"type": "string", "enum": list(SITES)},
+                              "rationale": {"type": "string", "maxLength": 240}}))
+    for p, o in options.items():
+        for metal, partners in o["swaps"].items():
+            variants.append(_obj({"parent": {"type": "string", "const": p},
+                                  "op": {"type": "string", "const": "swap_metal"},
+                                  "from_metal": {"type": "string", "const": metal},
+                                  "to_metal": {"type": "string", "enum": partners},
+                                  "rationale": {"type": "string", "maxLength": 240}}))
+    return _obj({"mutations": {"type": "array", "items": {"anyOf": variants}, "maxItems": max_items}})
