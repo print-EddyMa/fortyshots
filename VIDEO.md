@@ -42,13 +42,48 @@ Live segment (one take is enough; you can retry):
 - [ ] `./lab live`, then in a second Terminal tab `./lab live run`. This is a demo run on the development pool P0, not part of the benchmark; the video says so in a caption.
 - [ ] Open the Model tab and hold on it for 3 seconds: hash, quant, build, tok/s, `network: off`.
 - [ ] Approve each batch with `a` when asked.
-- [ ] Stop the recording (Cmd-Ctrl-Esc). Save it as `live.mov` on the Desktop.
+- [ ] Stop the recording (Cmd-Ctrl-Esc) after the first batch is revealed; a few minutes is enough, and a short file keeps its quality through `push-media`. Save it as `live.mov` on the Desktop.
+- [ ] Note three times from the QuickTime playhead (seconds): Wi-Fi off, the Model tab on screen, your first `a`. They become `--live-cuts` below.
 - [ ] `./lab stop`. Turn Wi-Fi back on.
 
 Narration:
 - [ ] QuickTime > File > New Audio Recording. Quiet room, phone away. Read the narration column above, two takes. Save the better one as `voice.m4a` on the Desktop.
 
 Upload:
-- [ ] `./lab push` (the demo run) and `./lab push-media ~/Desktop/voice.m4a ~/Desktop/live.mov` (re-encodes anything over 95 MB). Both end with a line starting `pushed`.
+- [ ] `./lab push` (the demo run), then `./lab push-media ~/Desktop/voice.m4a ~/Desktop/live.mov`. It commits both files to the orphan branch `media` (not `main`) and re-encodes anything over 95 MB, so `live.mov` may arrive as `live.mp4`. Both commands end with a line starting `pushed`.
 
 Claude then cuts the video from your two files plus browser B-roll (captions, speed labels, lower third) and sends it back for review. You upload the final file as unlisted to a video account you already have and paste the link into SUBMISSION.md.
+
+## How to assemble (in the container)
+
+The tools are in `web/scripts/video/`; everything they write goes to `media/` (gitignored).
+
+```bash
+# 1. The recordings: copy media/voice.m4a and media/live.mov (or live.mp4) from origin/media
+web/scripts/video/fetch-media.sh
+
+# 2. The site with the real runs, then the browser B-roll of the showcase run
+#    (runs/index.json `showcase`, else the first A5 run on P1): 11 shots, each 1920x1080 and 1080x1920
+(cd web && npm run build)
+node web/scripts/video/record-broll.mjs             # -> media/broll/*.webm + media/broll/shots.json
+#    one shot again: node web/scripts/video/record-broll.mjs --only calibrate-oracle
+
+# 3. Numbers. Placeholders fill from results/results.json and `git rev-list --count hackathon-start..HEAD`;
+#    sentence placeholders go in media/values.json, e.g.
+#    {"VS_RANDOM": "finds twice as many", "LEAK_SENTENCE": "no sign of recall", "WHAT_IT_USED": "the random forest"}
+python3 web/scripts/video/captions.py --voice media/voice.m4a --variant A   # check: prints row timing, lists anything unfilled
+
+# 4. Cut. live cuts are in-out seconds of live.mov (Wi-Fi off, ./lab live, the Model tab); if they add up to more
+#    than the 16 s row they are sped up and labelled "N× speed".
+web/scripts/video/assemble.sh --variant A --live-cuts "3-8,40-46,95-101"
+#    -> media/fortyshots-demo.mp4 (1920x1080, H.264 + AAC, fails above 3:00) + media/fortyshots-demo.srt
+#    -> media/fortyshots-x-clip.mp4 (1080x1920, 40 s, captions burned in)
+
+# 5. Social card
+(cd web && npm run og)                              # -> web/public/og.png and docs/og.png (1200x630)
+```
+
+- Draft without recordings (B-roll only, silent, estimated caption timing, numbers from the showcase run): `web/scripts/video/assemble.sh --draft` writes `media/draft-demo.mp4` and `media/draft-x-clip.mp4`.
+- Timing: picture rows start at the storyboard times. `captions.py` finds the speech in `voice.m4a` with ffmpeg `silencedetect`, aligns the sentences to it, and places each row's narration 0.5 s into its row; a row whose narration runs long pushes the next row back rather than talking over it. Inspect or hand-edit `media/timeline.json`, then `assemble.sh --timeline media/timeline.json`.
+- Footage per row is picked from the picture column; `media/cuts.json` overrides a row, e.g. `{"3": [{"live": true, "weight": 1}]}` or `{"x:2": [{"shot": "console-8x", "at": "play", "weight": 1}]}`.
+- Other switches: `--no-captions` (main video without burned captions), `--no-x`, `--only-x`, `--preset veryfast`. On a Mac: `brew install ffmpeg-full` if `ffmpeg` lacks drawtext or libass.

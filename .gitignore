@@ -12,3 +12,4 @@ node_modules/
 web/dist/
 cassettes/*.local.jsonl
 .DS_Store
+media/
