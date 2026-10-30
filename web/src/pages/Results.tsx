@@ -230,6 +230,7 @@ export function ResultsPage() {
   const arm = (a: string) => R.arms.find((x) => x.arm === a);
   const a5 = arm('A5');
   const a3 = arm('A3');
+  const a2 = arm('A2');
   const a0 = arm('A0');
   const a5runs = (index.data ?? []).filter((r) => r.arm === 'A5' && r.duration_s != null);
   const minutes = a5runs.length ? a5runs.reduce((s, r) => s + (r.duration_s ?? 0), 0) / a5runs.length / 60 : null;
@@ -272,13 +273,39 @@ export function ResultsPage() {
         <div className="stats">
           <Stat label="Glimmer agent (A5), hits at 40" value={num(a5?.hits_mean, 1)} unit="/ 40" sub={a5 ? `95% CI ${ci(a5.hits_ci[0], a5.hits_ci[1])}, n = ${a5.n_runs} runs` : undefined} />
           <Stat label="Enrichment over base rate" value={num(a5?.enrichment, 1)} unit="×" sub={`base rate ${num(R.base_rate * 100, 1)}%`} />
-          <Stat label="RF-UCB (A3), hits at 40" value={num(a3?.hits_mean, 1)} unit="/ 40" sub={a3 ? `95% CI ${ci(a3.hits_ci[0], a3.hits_ci[1])}, n = ${a3.n_runs}` : undefined} />
+          <Stat label="Best baseline, MACE-greedy (A2)" value={num(a2?.hits_mean, 1)} unit="/ 40" sub={a2 ? `RF-UCB (A3): ${num(a3?.hits_mean, 2)}` : undefined} />
           <Stat label="Random (A0), hits at 40" value={num(a0?.hits_mean, 1)} unit="/ 40" sub={a0 ? `95% CI ${ci(a0.hits_ci[0], a0.hits_ci[1])}, n = ${a0.n_runs}` : undefined} />
           <Stat label="Proposer Brier score" value={num(R.calibration?.brier, 3)} sub={R.calibration ? `n = ${R.calibration.n} stated P(hit); lower is better` : 'not available'} />
           <Stat label="Claims verified" value={R.claims ? R.claims.verified : '—'} unit={R.claims ? `/ ${R.claims.n}` : undefined} sub={R.claims ? `${R.claims.flagged} flagged by the claim checker` : undefined} />
           <Stat label="Lookups to first hit (A5)" value={num(a5?.first_hit_mean, 1)} sub={a0 ? `random: ${num(a0.first_hit_mean, 1)}` : undefined} />
           <Stat label="Minutes per campaign (A5)" value={num(minutes, 1)} unit="min" sub={a5runs.length ? `mean of ${a5runs.length} runs on the laptop` : undefined} />
         </div>
+      </section>
+
+      <section className="wrap section">
+        <h2 className="fig-title">Why this is hard</h2>
+        <p className="fig-sub">
+          DFT binding energy of CO2 against water for every MOF in the six pools. Water binds more strongly than CO2 in 85% of them (above the
+          dashed line), which is why sorbents fail in humid air. Filled: hits, which bind CO2 below −0.5 eV and more strongly than water.
+        </p>
+        {pools.data ? (
+          (() => {
+            const rows = Object.values(pools.data.pools).flat();
+            const hits = rows.filter((r) => r.hit).length;
+            return (
+              <ScatterChart
+                points={rows.map((r) => ({ x: r.E_H2O, y: r.E_CO2, strong: r.hit, id: r.id }))}
+                xLabel="E water (eV)"
+                yLabel="E CO2 (eV)"
+                height={360}
+                ariaLabel={`CO2 versus water binding energy for ${rows.length} MOFs, ${hits} hits`}
+                annotation={`n = ${rows.length.toLocaleString()} MOFs · ${hits} hits (${num((100 * hits) / rows.length, 1)}%) · dashed: equal binding · ODAC23 DFT`}
+              />
+            );
+          })()
+        ) : (
+          <p className="muted">{pools.error ?? 'Loading pools…'}</p>
+        )}
       </section>
 
       <section className="wrap section">
