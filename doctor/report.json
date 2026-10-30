@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-30T03:41:58+00:00",
+  "generated": "2026-10-30T12:38:44+00:00",
   "base_url": "http://127.0.0.1:8080",
   "model": {
     "gguf": "Muse-Glimmer-30B-UD-Q3_K_XL.gguf",
@@ -24,8 +24,8 @@
         "n_ctx": 32768,
         "total_slots": 1,
         "modalities": {
-          "vision": false,
-          "video": false,
+          "vision": true,
+          "video": true,
           "audio": false
         },
         "models": [
@@ -42,15 +42,15 @@
         "content": "READY",
         "prompt_n": 64,
         "cache_n": 0,
-        "prompt_ms": 2815.35,
-        "prompt_per_second": 22.732519935354397,
-        "predicted_n": 52,
-        "predicted_per_second": 6.934615684278643,
+        "prompt_ms": 2631.231,
+        "prompt_per_second": 24.323216015621583,
+        "predicted_n": 51,
+        "predicted_per_second": 6.887328403934648,
         "finish_reason": "stop",
-        "reasoning_chars": 188,
-        "dur_ms": 10172
+        "reasoning_chars": 178,
+        "dur_ms": 10004
       },
-      "dur_ms": 10172
+      "dur_ms": 10004
     },
     {
       "name": "tool_call",
@@ -76,15 +76,15 @@
         "parallel": true,
         "prompt_n": 426,
         "cache_n": 0,
-        "prompt_ms": 14084.894,
-        "prompt_per_second": 30.24516904422568,
-        "predicted_n": 203,
-        "predicted_per_second": 6.61973992024983,
+        "prompt_ms": 12719.947,
+        "prompt_per_second": 33.49070558234244,
+        "predicted_n": 262,
+        "predicted_per_second": 6.609285407860142,
         "finish_reason": "tool_calls",
-        "reasoning_chars": 295,
-        "dur_ms": 44611
+        "reasoning_chars": 572,
+        "dur_ms": 52337
       },
-      "dur_ms": 44611
+      "dur_ms": 52338
     },
     {
       "name": "parallel_tool_calls",
@@ -100,19 +100,19 @@
       "ok": true,
       "required": true,
       "detail": {
-        "content": "The result of 17 + 25 is **42**.\n\nTool output: `add: 42`\n",
+        "content": "The sum is 42.\n\n17 + 25 = 42",
         "n_tool_calls": 0,
         "prompt_n": 108,
         "cache_n": 394,
-        "prompt_ms": 4279.602,
-        "prompt_per_second": 25.235991571178815,
-        "predicted_n": 69,
-        "predicted_per_second": 5.898722917813701,
+        "prompt_ms": 3943.302,
+        "prompt_per_second": 27.388214242784343,
+        "predicted_n": 51,
+        "predicted_per_second": 6.839643999265696,
         "finish_reason": "stop",
-        "reasoning_chars": 125,
-        "dur_ms": 15818
+        "reasoning_chars": 99,
+        "dur_ms": 11288
       },
-      "dur_ms": 15818
+      "dur_ms": 11288
     },
     {
       "name": "json_schema",
@@ -123,15 +123,15 @@
         "answer": 391,
         "prompt_n": 19,
         "cache_n": 49,
-        "prompt_ms": 1343.552,
-        "prompt_per_second": 14.141618634783024,
-        "predicted_n": 100,
-        "predicted_per_second": 5.821848609824881,
+        "prompt_ms": 1220.173,
+        "prompt_per_second": 15.571562393201619,
+        "predicted_n": 88,
+        "predicted_per_second": 6.758708887725493,
         "finish_reason": "stop",
-        "reasoning_chars": 294,
-        "dur_ms": 18377
+        "reasoning_chars": 281,
+        "dur_ms": 14250
       },
-      "dur_ms": 18377
+      "dur_ms": 14250
     },
     {
       "name": "json_schema_with_tools",
@@ -142,15 +142,15 @@
         "answer": 391,
         "prompt_n": 19,
         "cache_n": 394,
-        "prompt_ms": 1393.892,
-        "prompt_per_second": 13.63089823314862,
-        "predicted_n": 95,
-        "predicted_per_second": 5.664380968427162,
+        "prompt_ms": 1261.067,
+        "prompt_per_second": 15.066606294510919,
+        "predicted_n": 134,
+        "predicted_per_second": 5.589754627003449,
         "finish_reason": "stop",
-        "reasoning_chars": 285,
-        "dur_ms": 18002
+        "reasoning_chars": 432,
+        "dur_ms": 25077
       },
-      "dur_ms": 18002
+      "dur_ms": 25078
     },
     {
       "name": "lab_batch_schema",
@@ -164,33 +164,54 @@
         ],
         "prompt_n": 215,
         "cache_n": 49,
-        "prompt_ms": 7386.917,
-        "prompt_per_second": 29.105511812302748,
-        "predicted_n": 335,
-        "predicted_per_second": 6.105051410930388,
+        "prompt_ms": 6755.794,
+        "prompt_per_second": 31.824534614288122,
+        "predicted_n": 379,
+        "predicted_per_second": 6.234030347952404,
         "finish_reason": "stop",
-        "reasoning_chars": 622,
-        "dur_ms": 62115
+        "reasoning_chars": 668,
+        "dur_ms": 67512
       },
-      "dur_ms": 62367
+      "dur_ms": 67894
     },
     {
       "name": "vision",
-      "ok": false,
+      "ok": true,
       "required": true,
       "detail": {
-        "error": "LLMError: HTTP 500 from /v1/chat/completions: {\"error\":{\"code\":500,\"message\":\"image input is not supported - hint: if this is unexpected, you may need to provide the mmproj\",\"type\":\"server_error\"}}"
+        "count": 5,
+        "expected": 5,
+        "prompt_n": 388,
+        "cache_n": 49,
+        "prompt_ms": 15921.996,
+        "prompt_per_second": 24.36880401175833,
+        "predicted_n": 128,
+        "predicted_per_second": 7.1411128316632215,
+        "finish_reason": "stop",
+        "reasoning_chars": 403,
+        "dur_ms": 33789
       },
-      "dur_ms": 50
+      "dur_ms": 33916
     },
     {
       "name": "vision_parity_reading",
-      "ok": false,
+      "ok": true,
       "required": false,
       "detail": {
-        "error": "LLMError: HTTP 500 from /v1/chat/completions: {\"error\":{\"code\":500,\"message\":\"image input is not supported - hint: if this is unexpected, you may need to provide the mmproj\",\"type\":\"server_error\"}}"
+        "true": 0.881,
+        "estimate": 0.78,
+        "abs_error": 0.101,
+        "prompt_n": 449,
+        "cache_n": 0,
+        "prompt_ms": 17719.493,
+        "prompt_per_second": 25.339325453612023,
+        "predicted_n": 307,
+        "predicted_per_second": 5.605688916910006,
+        "finish_reason": "stop",
+        "reasoning_chars": 964,
+        "dur_ms": 72363
       },
-      "dur_ms": 98
+      "dur_ms": 72530
     },
     {
       "name": "reasoning_budget",
@@ -200,51 +221,162 @@
         "budget": 1024,
         "within_budget": true,
         "low": {
-          "reasoning_tokens": 203,
-          "content_chars": 401,
-          "prompt_n": 83,
-          "cache_n": 49,
-          "prompt_ms": 3332.703,
-          "prompt_per_second": 24.904709480562776,
-          "predicted_n": 292,
-          "predicted_per_second": 5.298541591903668,
-          "finish_reason": "stop",
-          "reasoning_chars": 925,
-          "dur_ms": 58267
-        },
-        "high": {
-          "reasoning_tokens": 712,
-          "content_chars": 322,
+          "reasoning_tokens": 142,
+          "content_chars": 435,
           "prompt_n": 132,
           "cache_n": 0,
-          "prompt_ms": 4801.936,
-          "prompt_per_second": 27.488912805168585,
-          "predicted_n": 789,
-          "predicted_per_second": 5.771523321509913,
+          "prompt_ms": 4409.716,
+          "prompt_per_second": 29.933900505157247,
+          "predicted_n": 248,
+          "predicted_per_second": 5.859933636132948,
           "finish_reason": "stop",
-          "reasoning_chars": 3235,
-          "dur_ms": 141348
+          "reasoning_chars": 602,
+          "dur_ms": 46695
+        },
+        "high": {
+          "reasoning_tokens": 979,
+          "content_chars": 351,
+          "prompt_n": 132,
+          "cache_n": 0,
+          "prompt_ms": 4880.447,
+          "prompt_per_second": 27.046702894222598,
+          "predicted_n": 1072,
+          "predicted_per_second": 6.135787767604134,
+          "finish_reason": "stop",
+          "reasoning_chars": 4468,
+          "dur_ms": 179476
         }
       },
-      "dur_ms": 199638
+      "dur_ms": 226276
     },
     {
       "name": "throughput",
-      "ok": false,
+      "ok": true,
       "required": false,
       "detail": {
-        "error": "LLMError: HTTP 500 from /v1/chat/completions: {\"error\":{\"code\":500,\"message\":\"image input is not supported - hint: if this is unexpected, you may need to provide the mmproj\",\"type\":\"server_error\"}}"
+        "decode_tok_s": 6.255500265321175,
+        "roles": {
+          "director": {
+            "cold": {
+              "prompt_n": 1993,
+              "cache_n": 0,
+              "prompt_ms": 59652.698,
+              "prompt_per_second": 33.41005632301828,
+              "predicted_n": 752,
+              "predicted_per_second": 6.5577906920168445,
+              "finish_reason": "tool_calls",
+              "reasoning_chars": 1775,
+              "dur_ms": 174284
+            },
+            "warm": {
+              "prompt_n": 5,
+              "cache_n": 1988,
+              "prompt_ms": 711.339,
+              "prompt_per_second": 7.028997425981141,
+              "predicted_n": 16,
+              "predicted_per_second": 7.198505014478593,
+              "finish_reason": "length",
+              "reasoning_chars": 41,
+              "dur_ms": 2855
+            },
+            "completion_tokens": 752,
+            "prompt_tokens": 1993
+          },
+          "proposer": {
+            "cold": {
+              "prompt_n": 2466,
+              "cache_n": 0,
+              "prompt_ms": 72872.421,
+              "prompt_per_second": 33.83996258337568,
+              "predicted_n": 2348,
+              "predicted_per_second": 7.304253945836097,
+              "finish_reason": "stop",
+              "reasoning_chars": 4077,
+              "dur_ms": 394757
+            },
+            "warm": {
+              "prompt_n": 5,
+              "cache_n": 2461,
+              "prompt_ms": 726.141,
+              "prompt_per_second": 6.885715033306204,
+              "predicted_n": 16,
+              "predicted_per_second": 7.171999366951523,
+              "finish_reason": "length",
+              "reasoning_chars": 36,
+              "dur_ms": 2863
+            },
+            "completion_tokens": 2348,
+            "prompt_tokens": 2466
+          },
+          "critic": {
+            "cold": {
+              "prompt_n": 1326,
+              "cache_n": 0,
+              "prompt_ms": 43220.3,
+              "prompt_per_second": 30.680027672181822,
+              "predicted_n": 571,
+              "predicted_per_second": 5.953209838625506,
+              "finish_reason": "stop",
+              "reasoning_chars": 1739,
+              "dur_ms": 140063
+            },
+            "warm": {
+              "prompt_n": 517,
+              "cache_n": 809,
+              "prompt_ms": 19456.524,
+              "prompt_per_second": 26.572063951402622,
+              "predicted_n": 16,
+              "predicted_per_second": 8.644850521889627,
+              "finish_reason": "length",
+              "reasoning_chars": 31,
+              "dur_ms": 21249
+            },
+            "completion_tokens": 571,
+            "prompt_tokens": 1326
+          },
+          "reporter": {
+            "cold": {
+              "prompt_n": 2319,
+              "cache_n": 0,
+              "prompt_ms": 69796.701,
+              "prompt_per_second": 33.225066038579676,
+              "predicted_n": 738,
+              "predicted_per_second": 5.824962991923559,
+              "finish_reason": "stop",
+              "reasoning_chars": 1473,
+              "dur_ms": 196554
+            },
+            "warm": {
+              "prompt_n": 5,
+              "cache_n": 2314,
+              "prompt_ms": 739.683,
+              "prompt_per_second": 6.759652445709852,
+              "predicted_n": 16,
+              "predicted_per_second": 6.791472807848407,
+              "finish_reason": "length",
+              "reasoning_chars": 51,
+              "dur_ms": 2985
+            },
+            "completion_tokens": 738,
+            "prompt_tokens": 2319
+          }
+        }
       },
-      "dur_ms": 638172
+      "dur_ms": 936134
     }
   ],
-  "estimate": null,
+  "estimate": {
+    "campaign_minutes": 110.3,
+    "per_round_minutes": 26.8,
+    "seeds_per_pool_k": 1,
+    "rule": "A5 seeds per test pool: <=15 min k=3; <=25 min k=2; else k=1 (PREREG section 7)"
+  },
   "recommendations": {
     "shared_tools": true,
     "action_mode": "native",
-    "vision": false
+    "vision": true
   },
-  "ok": false,
+  "ok": true,
   "summary": {
     "server": true,
     "plain_chat": true,
@@ -254,9 +386,9 @@
     "json_schema": true,
     "json_schema_with_tools": true,
     "lab_batch_schema": true,
-    "vision": false,
-    "vision_parity_reading": false,
+    "vision": true,
+    "vision_parity_reading": true,
     "reasoning_budget": true,
-    "throughput": false
+    "throughput": true
   }
 }
