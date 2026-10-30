@@ -511,6 +511,12 @@ fs_has_flag() { "$FS" "$1" --help 2>&1 | grep -q -- "$2"; }
 # Arguments every campaign gets: mock runs must say so (run ids get the mock- prefix, headers say mode mock).
 fs_mode_args() { if mock; then echo "--mode mock"; fi; }
 
+# A profile without the vision file (mmproj) cannot take images: campaigns then run the Critic text-only.
+fs_vision_args() {
+  local prof; prof="$(server_running_profile)"; [ -n "$prof" ] || prof="$(active_profile)"
+  if ! mock && [ -z "$(H profile "$PROFILES" "$prof" mmproj)" ]; then echo "--no-vision"; fi
+}
+
 # Run headers take the GGUF sha256 and the exact server command from these variables (fortyshots/attest.py).
 # The sha256 is only exported after lab has checked the file against Hugging Face's published value.
 attest_env() {
@@ -749,7 +755,8 @@ rehearse() {
   if fs_has_flag run --rounds; then extra=(--rounds 1); else extra=(--max-minutes 12); fi
   local mode=live; mock && mode=mock
   attest_env
-  run_watched 0 "$base" "$FS" run --arm A5 --pool P0 --seed "$seed" --mode "$mode" --base-url "$BASE_URL" "${extra[@]}"
+  # shellcheck disable=SC2046  # fs_vision_args is empty or one word
+  run_watched 0 "$base" "$FS" run --arm A5 --pool P0 --seed "$seed" --mode "$mode" --base-url "$BASE_URL" $(fs_vision_args) "${extra[@]}"
   maxg="$(cat "$STATE/swap_max_growth" 2>/dev/null || echo 0)"
   run_dir="$(H runs "$REPO/runs" 0 | awk -F'\t' -v p="A5-P0-s$seed-" 'index($1, p) > 0 {r = $1} END {print r}')"
   speed=""; [ -n "$run_dir" ] && speed="$(H run-speed "$REPO/runs/$run_dir")"
@@ -826,7 +833,8 @@ cmd_live() {
     info "network: $(net_state)"
     local mode=live; mock && mode=mock
     attest_env
-    "$FS" run --arm A5 --pool P0 --seed "$seed" --mode "$mode" --base-url "$BASE_URL" "${extra[@]}"
+    # shellcheck disable=SC2046  # fs_vision_args is empty or one word
+    "$FS" run --arm A5 --pool P0 --seed "$seed" --mode "$mode" --base-url "$BASE_URL" $(fs_vision_args) "${extra[@]}"
     local rc=$?
     if [ $rc -eq 0 ]; then ok "Demo campaign finished."; else warn "The demo campaign ended with code $rc."; fi
     push_runs all || true
@@ -915,7 +923,7 @@ cmd_record() {
     attempt=$((attempt + 1))
     step "fortyshots record $pname (attempt $attempt of 3)"
     # shellcheck disable=SC2046  # fs_mode_args is empty or two words
-    run_watched 0 "$base" "$FS" record "$pf" --base-url "$BASE_URL" $(fs_mode_args)
+    run_watched 0 "$base" "$FS" record "$pf" --base-url "$BASE_URL" $(fs_mode_args) $(fs_vision_args)
     rc=$RUN_RC
     [ "$INTERRUPTED" = 1 ] && break
     [ $rc -eq 0 ] && break

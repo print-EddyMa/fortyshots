@@ -33,7 +33,7 @@ These are fixed in `CONTRACTS.md`, and this file repeats them.
 
 ## 4. Budget and protocol
 
-40 lookups per campaign, in 4 rounds of 10. A lookup returns `E_CO2`, `E_H2O` and `hit` for that MOF only. `request_dft` enforces the budget in code. A campaign that aborts (the 45-minute cap, or three consecutive failed attempts at one model call — timeout, unreachable server or HTTP error — with backoff and a server health check between attempts) is never dropped or re-rolled; this is intention to treat. **Autofill:** lookups still unspent when a campaign ends are bought by the harness: remaining lookups are bought in S_mace order (arm-neutral). Autofilled picks count as the agent's picks, and the ledger records them. Every pick chosen by code rather than the model (Proposer fallbacks, live-mode reject replacements, end-of-run autofill) is listed in `summary.harness_picks` / `summary.harness_pick_ids`; `summary.autofill` counts the end-of-run fill only. In A4 the Proposer's rationales are capped at 140 characters. A model call that comes back empty with finish_reason=length, or is refused for context size, is retried once with older tool results trimmed and images dropped; a length cut also lowers reasoning_strength one level for that retry.
+40 lookups per campaign, in 4 rounds of 10. A lookup returns `E_CO2`, `E_H2O` and `hit` for that MOF only. `request_dft` enforces the budget in code. A campaign that aborts (the 120-minute cap, or three consecutive failed attempts at one model call — timeout, unreachable server or HTTP error — with backoff and a server health check between attempts) is never dropped or re-rolled; this is intention to treat. **Autofill:** lookups still unspent when a campaign ends are bought by the harness: remaining lookups are bought in S_mace order (arm-neutral). Autofilled picks count as the agent's picks, and the ledger records them. Every pick chosen by code rather than the model (Proposer fallbacks, live-mode reject replacements, end-of-run autofill) is listed in `summary.harness_picks` / `summary.harness_pick_ids`; `summary.autofill` counts the end-of-run fill only. In A4 the Proposer's rationales are capped at 140 characters. A model call that comes back empty with finish_reason=length, or is refused for context size, is retried once with older tool results trimmed and images dropped; a length cut also lowers reasoning_strength one level for that retry.
 
 ## 5. Arms
 
@@ -98,7 +98,7 @@ Throughput is measured by `./lab doctor` and the P0 pilot, and k is fixed at the
 | ≤ 25 min | k = 2 (10 runs) | k = 1 | k = 1 |
 | > 25 min | k = 1 (5 runs) | k = 1 | k = 1, on P1–P3 only |
 
-Recording order per night: A5 first, then A4, A6, L. A run that crashes is resumed from its last checkpoint. A model call that failed before the crash is sent again; its logged failures do not end the run. A run that cannot finish within the 45-minute cap is logged as aborted and counts (§4). Runs are never re-rolled.
+Recording order per night: A5 first, then A4, A6, L. A run that crashes is resumed from its last checkpoint. A model call that failed before the crash is sent again; its logged failures do not end the run. A run that cannot finish within the 120-minute cap is logged as aborted and counts (§4). Runs are never re-rolled.
 
 ## 8. Statistics
 

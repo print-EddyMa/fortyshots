@@ -182,7 +182,7 @@ def main(argv=None):
     p = sub.add_parser("serve", help="live mode web server")
     p.add_argument("--port", type=int, default=7777)
     p.add_argument("--runs-dir", default="runs")
-    p.add_argument("--site", default="web/dist")
+    p.add_argument("--site", default="docs")
     p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("index", help="rebuild runs/index.json")
     p.add_argument("--runs-dir", default="runs")

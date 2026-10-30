@@ -95,8 +95,8 @@ printf '#!/bin/sh\nf="%s/swapcount"; n=$(cat "$f" 2>/dev/null || echo 0); echo $
 chmod +x "$T/fakeswap"
 (cd "$R" && ./lab stop >/dev/null 2>&1; LAB_ENFORCE_SWAP=1 LAB_SWAP_CMD="$T/fakeswap" ./lab doctor) > "$T/out" 2>&1; echo $? > "$T/rc"
 check "doctor with 2 GB swap growth fails" [ "$(rc)" = 1 ]
-check "  ... switches the default profile to live" [ "$(cat "$GLIMMER_DIR/.lab/profile" 2>/dev/null)" = live ]
-check "  ... asks to download the live files" out_has "Next: ./lab download live && ./lab doctor"
+check "  ... switches the default profile to lean" [ "$(cat "$GLIMMER_DIR/.lab/profile" 2>/dev/null)" = lean ]
+check "  ... asks to download the lean files" out_has "Next: ./lab download lean && ./lab doctor"
 check "  ... report says verdict swap" sh -c "grep -l '\"verdict\": \"swap\"' '$R'/doctor/*.json >/dev/null"
 rm -f "$GLIMMER_DIR/.lab/profile"
 

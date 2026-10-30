@@ -160,7 +160,7 @@ export function Landing() {
         <div className="rows how">
           <div className="row">
             <span className="name">Muse Glimmer 30B</span>
-            <span className="desc">Director, Proposer, Critic and Reporter. One open-weights model, Q4_K_M, on a laptop.</span>
+            <span className="desc">Director, Proposer, Critic and Reporter. One open-weights model with Meta's DFlash drafter, on a laptop.</span>
             <span className="trail">llama.cpp</span>
           </div>
           <div className="row">

@@ -17,8 +17,8 @@ from .cassette import Cassette, canonical
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 MODEL_ALIAS = "muse-glimmer-30b"
 MIN_TIMEOUT_S = 300.0          # floor of the per-call read timeout
-DEFAULT_DECODE_TPS = 8.0       # assumed decode speed when doctor/report.json has none (measured: ~11-13 tok/s)
-DEFAULT_PREFILL_TPS = 100.0    # assumed cold prefill speed when doctor/report.json has none
+DEFAULT_DECODE_TPS = 5.0       # assumed decode speed when doctor/report.json has none (base M4 + DFlash: ~6.8 tok/s)
+DEFAULT_PREFILL_TPS = 25.0     # assumed cold prefill speed when doctor/report.json has none (base M4: ~34 tok/s)
 PREFILL_BASE_S = 30.0          # fixed part of the prefill allowance (slot setup, image encoding)
 IMAGE_TOKENS = 1024            # prompt tokens charged per image when estimating prefill
 DECODE_SLACK = 1.5             # the generation may run this much slower than measured

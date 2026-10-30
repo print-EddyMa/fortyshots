@@ -1,6 +1,6 @@
 # Mac setup: the only page you need
 
-This page lists everything you run on the MacBook (M4 Pro, 24 GB), day by day. Each step is one command. Every command prints what it did, and if something fails, the last lines tell you the exact command to try next.
+This page lists everything you run on the MacBook (M4, 24 GB), day by day. Each step is one command. Every command prints what it did, and if something fails, the last lines tell you the exact command to try next.
 
 There are no signups and no API keys. The only accounts are GitHub (yours) and, at the end, the Cerebral Valley form and X.
 

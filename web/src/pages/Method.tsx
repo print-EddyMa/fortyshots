@@ -71,7 +71,7 @@ export function MethodPage() {
 
         <h2 id="agent">The agent</h2>
         <p>
-          One model plays four roles: Muse Glimmer 30B, Meta's open-weights model, as a Q4_K_M GGUF under llama.cpp on a 24 GB
+          One model plays four roles: Muse Glimmer 30B, Meta's open-weights model, as a 3-bit GGUF with Meta's DFlash drafter under llama.cpp on a 24 GB
           MacBook.
         </p>
         <ol>

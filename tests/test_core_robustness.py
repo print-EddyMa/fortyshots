@@ -179,10 +179,10 @@ def test_model_down_aborts_with_autofill_and_a_summary(tmp_path):
 def test_timeout_scales_with_max_tokens_and_doctor_speed(tmp_path, monkeypatch):
     monkeypatch.delenv("FORTYSHOTS_TIMEOUT_S", raising=False)
     client = LLMClient(BASE_URL)
-    small = client.build_request([{"role": "user", "content": "x"}], max_tokens=1024)
+    small = client.build_request([{"role": "user", "content": "x"}], max_tokens=512)
     a4 = client.build_request([{"role": "user", "content": "x"}], max_tokens=5536)
     assert client.timeout_for(small) == 300  # the floor
-    assert client.timeout_for(a4) >= 5536 / 8 * 1.5  # default 8 tok/s when there is no doctor report
+    assert client.timeout_for(a4) >= 5536 / 5 * 1.5  # default 5 tok/s when there is no doctor report
     rep = tmp_path / "report.json"
     rep.write_text(json.dumps({"checks": [{"name": "throughput", "ok": True, "detail": {
         "decode_tok_s": 12.0, "roles": {"director": {"cold": {"prompt_per_second": 400.0}}}}}]}))

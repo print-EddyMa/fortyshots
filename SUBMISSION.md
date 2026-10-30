@@ -31,7 +31,7 @@ https://print-EddyMa.github.io/fortyshots/
 {{VIDEO_URL}}
 
 **Meta models and tools used**
-- Muse Glimmer 30B (open weights, Apache-2.0), run on our own hardware: MacBook Pro M4 Pro 24 GB, llama.cpp `llama-server`, Meta's `Q4_K_M` GGUF plus the `mmproj` vision projector. Every role in the agent is Glimmer: native tool calls, json_schema output, vision on its own plots, cited reports. {{DFLASH_SENTENCE}}
+- Muse Glimmer 30B (open weights, Apache-2.0), run on our own hardware: MacBook Pro M4 24 GB, llama.cpp `llama-server`, a 3-bit GGUF (unsloth UD-Q3_K_XL) with Meta's `mmproj` vision projector and Meta's DFlash drafter for speculative decoding (3.0 → 6.8 tok/s measured on this Mac). Every role in the agent is Glimmer: native tool calls, json_schema output, vision on its own plots, cited reports. {{DFLASH_SENTENCE}}
 - Meta FAIR ODAC23 dataset (CC-BY-4.0): the hidden DFT labels and the DFT-relaxed CO2 poses shown in the viewer.
 - Meta FAIR EquiformerV2 ODAC checkpoint: cross-check for agent-proposed variants (not a benchmark arm, because it was trained on ODAC23).
 - No Meta Model API and no partner inference were used, by choice: the project needs no signup or key of any kind.

@@ -63,26 +63,26 @@
   },
   "profiles": {
     "default": {
-      "description": "Meta Q4_K_M + vision, 32K context. Used for recorded campaigns.",
-      "model": "q4km",
+      "description": "unsloth UD-Q3_K_XL + vision + Meta DFlash drafter, 32K context. Measured on the base M4 (Oct 29): 6.8 tok/s decode, 34 tok/s prefill. Used for recorded campaigns.",
+      "model": "ud_q3kxl",
       "mmproj": "mmproj",
-      "draft": null,
+      "draft": "dflash",
       "ctx": 32768,
-      "quant": "Q4_K_M",
-      "est_total_gb": 19.5,
-      "headroom_gb": 4.5,
-      "fallback": "live"
+      "quant": "UD-Q3_K_XL",
+      "est_total_gb": 17.5,
+      "headroom_gb": 6.5,
+      "fallback": "lean"
     },
     "live": {
-      "description": "unsloth UD-Q4_K_XL + vision, 16K context. Smaller, for the live demo with a browser and screen recording open.",
-      "model": "ud_q4kxl",
+      "description": "Same model files as default with a 16K context, for the live demo with a browser and screen recording open.",
+      "model": "ud_q3kxl",
       "mmproj": "mmproj",
-      "draft": null,
+      "draft": "dflash",
       "ctx": 16384,
-      "quant": "UD-Q4_K_XL",
-      "est_total_gb": 18.2,
-      "headroom_gb": 5.8,
-      "fallback": "small"
+      "quant": "UD-Q3_K_XL",
+      "est_total_gb": 17.5,
+      "headroom_gb": 6.5,
+      "fallback": "lean"
     },
     "small": {
       "description": "unsloth UD-Q3_K_XL + vision, 32K context. Last fallback if the others swap.",
@@ -126,7 +126,29 @@
       "quant": "Q4_K_M",
       "est_total_gb": 19.9,
       "headroom_gb": 4.1,
-      "fallback": "small-dflash"
+      "fallback": null
+    },
+    "q4": {
+      "description": "Meta Q4_K_M + vision, no drafter. 3.9 tok/s on a base M4 (bench Oct 29); kept for comparison.",
+      "model": "q4km",
+      "mmproj": "mmproj",
+      "draft": null,
+      "ctx": 32768,
+      "quant": "Q4_K_M",
+      "est_total_gb": 19.5,
+      "headroom_gb": 4.5,
+      "fallback": "default"
+    },
+    "lean": {
+      "description": "unsloth UD-Q3_K_XL + Meta DFlash drafter, no vision, 32K context. Fallback if default swaps; the Critic then reads a text parity table.",
+      "model": "ud_q3kxl",
+      "mmproj": null,
+      "draft": "dflash",
+      "ctx": 32768,
+      "quant": "UD-Q3_K_XL",
+      "est_total_gb": 16.1,
+      "headroom_gb": 7.9,
+      "fallback": null
     }
   },
   "draft_flags": [

@@ -21,9 +21,9 @@ def test_profiles_are_consistent():
     cfg = json.loads((MAC / "profiles.json").read_text())
     assert set(cfg["profiles"]) >= {"default", "live", "small"}
     d = cfg["profiles"]["default"]
-    assert (d["model"], d["mmproj"], d["draft"], d["ctx"]) == ("q4km", "mmproj", None, 32768)
+    assert (d["model"], d["mmproj"], d["draft"], d["ctx"]) == ("ud_q3kxl", "mmproj", "dflash", 32768)
     live = cfg["profiles"]["live"]
-    assert (live["model"], live["mmproj"], live["ctx"]) == ("ud_q4kxl", "mmproj", 16384)
+    assert (live["model"], live["mmproj"], live["ctx"]) == ("ud_q3kxl", "mmproj", 16384)
     assert cfg["profiles"]["small"]["model"] == "ud_q3kxl"
     for name, p in cfg["profiles"].items():
         for key in ("model", "mmproj", "draft"):
@@ -31,7 +31,7 @@ def test_profiles_are_consistent():
         assert abs(p["est_total_gb"] + p["headroom_gb"] - cfg["ram_gb"]) < 0.05, name
         if p["draft"]:
             assert p["headroom_gb"] >= 3, f"{name}: DFlash needs at least 3 GB headroom"
-            assert p["model"] != "q4km", "never Q4_K_M + mmproj + dflash"
+            assert not (p["model"] == "q4km" and p["mmproj"]), "never Q4_K_M + mmproj + dflash"
         assert p["fallback"] is None or p["fallback"] in cfg["profiles"]
     for f in cfg["files"].values():
         assert len(f["sha256"]) == 64 and f["size"] > 10**9
@@ -42,8 +42,8 @@ def test_server_args():
     out = helper("server-args", str(MAC / "profiles.json"), "default", "/models", "8080")
     assert out.returncode == 0, out.stderr
     args = out.stdout.split("\n")
-    assert args[:2] == ["-m", "/models/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf"]
-    assert "--mmproj" in args and "-md" not in args
+    assert args[:2] == ["-m", "/models/Muse-Glimmer-30B-UD-Q3_K_XL.gguf"]
+    assert "--mmproj" in args and "-md" in args
     assert args[args.index("-c") + 1] == "32768" and args[args.index("--port") + 1] == "8080"
     out = helper("server-args", str(MAC / "profiles.json"), "small-dflash", "/models", "8080")
     assert "-md" in out.stdout.split("\n")

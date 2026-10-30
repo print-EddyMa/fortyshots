@@ -50,7 +50,7 @@ MODEL = {
     "flags": ["--jinja", "-c 32768", "-ngl 99", "--mmproj mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
               "--reasoning-budget 1024", "--parallel 1", "--cache-reuse 256"],
 }
-MACHINE = {"chip": "Apple M4 Pro (fixture)", "ram_gb": 24, "os": "macOS 15.6"}
+MACHINE = {"chip": "Apple M4 (fixture)", "ram_gb": 24, "os": "macOS 15.6"}
 
 
 # --------------------------------------------------------------------------- data

@@ -40,7 +40,7 @@ With {{A5_N}} agent runs the intervals are wide, and we say so. Every number abo
 ## How it works
 
 ```
-Mac (M4 Pro, 24 GB, Wi-Fi optional)
+Mac (M4, 24 GB, Wi-Fi optional)
   llama-server 127.0.0.1:8080  <-  Muse Glimmer 30B GGUF + vision projector, --jinja
   fortyshots agent             ->  tools over committed caches: query_pool, get_descriptors, cheap_score,
                                    fit_surrogate, calibrate_oracle, render_structure, request_dft (40 max)
@@ -70,9 +70,9 @@ One model file serves every role. Reasoning cannot be switched off in Glimmer; i
 
 | | Value |
 |---|---|
-| Machine | MacBook Pro, Apple M4 Pro, 24 GB unified memory, {{MACOS_VERSION}} |
-| Model file | `Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf` (Meta, 16.76 GB) + `mmproj-Muse-Glimmer-30B-Q4_K_M.gguf` (1.40 GB) |
-| sha256 (published by Hugging Face, checked by `./lab download` and recorded in every run header) | `4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e` |
+| Machine | MacBook Pro, Apple M4, 24 GB unified memory, {{MACOS_VERSION}} |
+| Model file | unsloth `Muse-Glimmer-30B-UD-Q3_K_XL.gguf` (13.36 GB) + Meta's `mmproj-Muse-Glimmer-30B-Q4_K_M.gguf` vision encoder (1.40 GB) + Meta's DFlash drafter `dflash-Muse-Glimmer-30B-Q4_K_M.gguf` (1.63 GB) |
+| sha256 (published by Hugging Face, checked by `./lab download` and recorded in every run header) | `820d18e00c59376331eba62dd716a6bcdcaa305c2316f5da3a2fab36c7c37e15` (model) |
 | llama.cpp | build {{LLAMA_BUILD}} (Homebrew), flags in [mac/profiles.json](mac/profiles.json) |
 | Context | 32,768 tokens, 1 slot |
 | GPU memory limit | `sudo sysctl iogpu.wired_limit_mb=20480` (resets on reboot) |
@@ -81,9 +81,18 @@ One model file serves every role. Reasoning cannot be switched off in Glimmer; i
 | Memory while recording | {{MEM_GB}} GB used, swap growth {{SWAP_GB}} GB |
 | Minutes per A5 campaign | {{CAMPAIGN_MIN}} (median) |
 | DFlash drafter A/B | {{DFLASH_RESULT}} |
-| Live-demo profile | unsloth `UD-Q4_K_XL` (15.88 GB) + the same vision file, 16K context |
+| Live-demo profile | the same files with a 16K context |
 
-The memory figures before measurement were estimates: weights plus vision about 18.2 GB, about 19.5 GB with the KV cache. The DFlash drafter is only tried on profiles with at least 3 GB of headroom, so never together with Q4_K_M and the vision file.
+**Why this build.** `./lab bench` on this Mac (Oct 29, a ~2K-token agent prompt, `doctor/*-bench-*.json` on branch `runs-mac`):
+
+| Profile | Decode | Cold prefill |
+|---|---|---|
+| Meta Q4_K_M + vision | 3.9 tok/s | 35 tok/s |
+| UD-Q3_K_XL + vision | 3.0 tok/s | 34 tok/s |
+| **UD-Q3_K_XL + vision + DFlash** | **6.8 tok/s** (68% of drafted tokens accepted) | 33 tok/s |
+| Meta Q4_K_M + DFlash, no vision | 7.0 tok/s (74% accepted) | 34 tok/s |
+
+A base M4 has about 120 GB/s of memory bandwidth, so decode is bandwidth-bound; Meta's DFlash drafter more than doubles it. Q4_K_M with vision and the drafter (19.8 GB) does not fit next to macOS in 24 GB, so the recorded campaigns use the 3-bit build, which keeps vision at the drafter's speed.
 
 ## What changed since the application
 
