@@ -107,3 +107,21 @@ def test_tool_schemas_per_arm():
 
 def _size(png: bytes) -> tuple[int, int]:
     return int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big")
+
+
+def test_similar_to_returns_unbought_neighbours_with_shared_metals():
+    import tempfile
+
+    from corehelp import FIXTURE_DATA
+
+    from fortyshots.tools import ARM_TOOLS, PoolEnv
+
+    env = PoolEnv(FIXTURE_DATA, "P0", tempfile.mkdtemp(), tools=ARM_TOOLS["A5"])
+    ref = env.df["id"].iloc[0]
+    out = env.call("similar_to", {"id": ref, "limit": 5}, "c0001")
+    assert out.ok and len(out.ids) == 5 and ref not in out.ids
+    dist = [r[1] for r in out.result["rows"]]
+    assert dist == sorted(dist)
+    assert "similar_to" not in ARM_TOOLS["A4"] and "similar_to" in ARM_TOOLS["A6"]
+    q = env.call("query_pool", {"sort_by": ' "S_mace"', "limit": 3}, "c0002")
+    assert q.ok

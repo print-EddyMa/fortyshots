@@ -29,9 +29,9 @@ CAMPAIGN STATE
 DIRECTOR = """ROLE: Director, round {round} of {rounds}.
 Explore the pool with tool calls so the Proposer can commit the next {batch} DFT lookups. You may call several tools \
 at once, at most {max_calls} calls this round.{calibration}
-Search like a scientist: early on, spread picks across different metals, pore sizes and cheap-simulator ranks so each \
-label teaches you something; when a hit appears, look for close relatives (same metal, similar pore size and \
-density); compare what the bought hits and misses have in common, and use query_pool filters to act on it.
+Search like a scientist. Make at least two different queries each round. Early on, spread picks across different \
+metals, pore sizes and cheap-simulator ranks so each label teaches you something. When a hit appears, call similar_to \
+on it. Compare what the bought hits and misses have in common, and use query_pool filters to act on it.
 When you have enough evidence, stop calling tools and write 2 to 4 sentences for the Proposer: what you learned and \
 which candidates look best, citing call ids."""
 

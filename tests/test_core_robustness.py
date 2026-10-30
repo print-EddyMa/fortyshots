@@ -277,7 +277,10 @@ def test_context_that_never_fits_degrades_to_empty_answers(tmp_path):
 
 def test_length_cut_retry_lowers_reasoning_strength(tmp_path):
     t = MockTransport(reasoning_tokens={"medium": 6000})  # every medium think overruns max_tokens
-    summary, camp = run(make_cfg(tmp_path, "A5"), transport=t)
+    from fortyshots.campaign import ROLE_STRENGTH
+
+    cfg = make_cfg(tmp_path, "A5", strengths={**ROLE_STRENGTH, "proposer": "medium"})
+    summary, camp = run(cfg, transport=t)
     evs = events(camp.run_dir)
     errs = [e["payload"] for e in evs if e["kind"] == "error" and e["payload"].get("cause") == "length"]
     assert errs and all(e["recovered"] and "reasoning_strength low" in e["message"] for e in errs)

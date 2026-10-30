@@ -1,21 +1,21 @@
 {
   "name": "pilot",
-  "description": "Three A5 campaigns on the dev pool P0 with the speed-tuned defaults (Director and Critic at low reasoning, 3 Director calls per round, short rationales). Seeds 3-5: seeds 0-2 were started with the slower settings. Never part of the benchmark.",
+  "description": "Three A5 campaigns on the dev pool P0 with the final tuning (one reasoning strength for every role, similar_to tool, search-strategy prompt). Seeds 6-8; earlier seeds used older settings. Never part of the benchmark.",
   "runs": [
     {
       "arm": "A5",
       "pool": "P0",
-      "seed": 3
+      "seed": 6
     },
     {
       "arm": "A5",
       "pool": "P0",
-      "seed": 4
+      "seed": 7
     },
     {
       "arm": "A5",
       "pool": "P0",
-      "seed": 5
+      "seed": 8
     }
   ]
 }

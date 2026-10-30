@@ -43,6 +43,12 @@ TOOL_SPECS = {
             "ascending": {"type": "boolean"},
             "limit": {"type": "integer", "minimum": 1, "maximum": MAX_IDS}},
             "required": ["sort_by"]}},
+    "similar_to": {
+        "description": "The unbought MOFs most similar to one MOF: same metals first, then nearest in pore sizes, "
+                       "density, void fraction, surface area and open metal sites. Use it to search around a hit.",
+        "parameters": {"type": "object", "properties": {
+            "id": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": MAX_IDS}},
+            "required": ["id"]}},
     "get_descriptors": {
         "description": "Full descriptor rows (formula, metals, open metal sites, pore sizes, surface area, density, "
                        "metal cost tier) for up to 25 ids.",
@@ -71,7 +77,8 @@ TOOL_SPECS = {
                                                         "rationale": {"type": "string"}},
                        "required": ["ids", "rationale"]}},
 }
-EXPLORE_TOOLS = ["query_pool", "get_descriptors", "cheap_score", "fit_surrogate", "calibrate_oracle", "render_structure"]
+EXPLORE_TOOLS = ["query_pool", "similar_to", "get_descriptors", "cheap_score", "fit_surrogate", "calibrate_oracle",
+                 "render_structure"]
 ARM_TOOLS = {
     "A5": EXPLORE_TOOLS,
     "A6": [t for t in EXPLORE_TOOLS if t != "fit_surrogate"],
@@ -188,6 +195,7 @@ class PoolEnv:
         unknown = set(filters) - set(FILTER_KEYS)
         if unknown:
             raise ToolError(f"unknown filters {sorted(unknown)}; valid: {FILTER_KEYS}")
+        sort_by = str(sort_by).strip().strip("\"'").strip()  # the model sometimes quotes the key
         if sort_by not in SORT_KEYS:
             raise ToolError(f"sort_by must be one of {SORT_KEYS}")
         df = self.df
@@ -214,6 +222,25 @@ class PoolEnv:
         res = {"n_match": int(mask.sum()), **_table(out, LIST_COLS)}
         summ = f"{int(mask.sum())} match; top {len(out)} by {sort_by} {'asc' if ascending else 'desc'}"
         return ToolOutput(True, summ, res, ids=self.last_listing)
+
+    def similar_to(self, id: str, limit: int = 10) -> ToolOutput:
+        (ref,) = self._check_ids([str(id).strip()])
+        df = self.df
+        cols = ["pld_A", "lcd_A", "density_gcm3", "void_fraction", "asa_m2g"]
+        x = df[cols].astype(float)
+        z = (x - x.mean()) / x.std(ddof=0).replace(0, 1)
+        z = z.fillna(0.0)
+        d = np.sqrt(((z - z.loc[df["id"] == ref].iloc[0]) ** 2).sum(axis=1))
+        d += (df["oms"].astype(bool) != bool(df.loc[df["id"] == ref, "oms"].iloc[0])).astype(float) * 0.5
+        metal_sets = df["metals"].fillna("").str.split(",").apply(lambda xs: {m.strip() for m in xs if m.strip()})
+        ref_metals = metal_sets[df["id"] == ref].iloc[0]
+        d += metal_sets.apply(lambda s: 0.0 if s & ref_metals else 2.0)
+        cand = df.assign(distance=d.round(3))
+        cand = cand[(cand["id"] != ref) & ~cand["id"].isin(self.bought)].sort_values(["distance", "id"])
+        out = cand.head(max(1, min(int(limit), MAX_IDS)))
+        self.last_listing = out["id"].tolist()
+        res = {"reference": ref, **_table(out, ["id", "distance", *LIST_COLS[1:]])}
+        return ToolOutput(True, f"{len(out)} unbought MOFs most similar to {ref}", res, ids=self.last_listing)
 
     def get_descriptors(self, ids) -> ToolOutput:
         ids = self._check_ids(_ids_arg({"ids": ids})[:MAX_IDS])
