@@ -21,3 +21,14 @@ start A5-P0-s4-202610301827
 [lab] a campaign finished; pushing it: pushed: 19 new or changed item(s) to branch runs-mac (5c44fbf)
 {"run_id": "A5-P0-s4-202610301827", "hits": 1, "spent": 40, "duration_s": 3482.1, "aborted": false}
 start A5-P0-s5-202610301925
+
+[lab] a campaign finished; pushing it: pushed: 20 new or changed item(s) to branch runs-mac (f2e2d8d)
+{"run_id": "A5-P0-s5-202610301925", "hits": 0, "spent": 40, "duration_s": 3633.3, "aborted": false}
+
+==> Plan 'pilot' summary
+        A5-P0-s3-202610301718              1/40 hits/lookups  68.8 min
+        A5-P0-s4-202610301827              1/40 hits/lookups  58.0 min
+        A5-P0-s5-202610301925              0/40 hits/lookups  60.6 min
+        swap growth during the plan: 2.91 GB; network now: on
+  ok    Stopped model server (pid 53693)
+  ok    Plan 'pilot' done.
