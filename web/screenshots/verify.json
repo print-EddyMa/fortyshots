@@ -1,5 +1,5 @@
 {
- "at": "2026-10-30T13:53:34.540Z",
+ "at": "2026-10-30T14:02:05.343Z",
  "showcase": "mock-A5-P1-s0-202610291830",
  "results": [
   {
@@ -80,7 +80,7 @@
   {
    "name": "console replays at 32x to completion",
    "ok": true,
-   "detail": "15.9 s, lookups 40 / 40"
+   "detail": "16.0 s, lookups 40 / 40"
   },
   {
    "name": "console: no errors during replay",
@@ -95,7 +95,7 @@
   {
    "name": "trace shows report, claimcheck, summary; flags in --fail; error events visible",
    "ok": true,
-   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793368404414\",\"caption\":\"m858b58a · C24H9O8Zn2 · 172 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":1,\"errorItems\":1}"
+   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793368914775\",\"caption\":\"m858b58a · C24H9O8Zn2 · 172 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":1,\"errorItems\":1}"
   },
   {
    "name": "queue (static): j/r/a marks 2 picks, sends one reject decision, saved locally",
@@ -110,7 +110,7 @@
   {
    "name": "results: re-roll A0/A1/A2 under 1 s",
    "ok": true,
-   "detail": "44 ms incl. render"
+   "detail": "43 ms incl. render"
   },
   {
    "name": "live: events stream over SSE",

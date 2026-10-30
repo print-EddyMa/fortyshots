@@ -688,3 +688,8 @@ main:focus {
 .answer-us .answer-val {
   color: var(--accent);
 }
+.steps3 .step-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--fg);
+}

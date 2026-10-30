@@ -22,12 +22,11 @@ export function RunsPage() {
     <Page current="/runs">
       <section className="wrap page-head">
         <h1 className="h-section">
-          <span>Every search.</span>
-          <span className="second">Replay any of them, step by step.</span>
+          <span>Runs.</span>
+          <span className="second">Replay any search.</span>
         </h1>
         <p className="lede">
-          Each row is one complete search: the AI picking 40 materials to test out of 500. Open one to watch exactly what it did
-          and why, from the log the laptop recorded, at normal speed or sped up.
+          Each run: 40 tests chosen from 500 candidates.
         </p>
         {prelim && <Prelim status={results.data?.status} mockRuns={hasMockRuns(index.data)} />}
       </section>

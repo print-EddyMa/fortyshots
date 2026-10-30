@@ -27,8 +27,8 @@ export function MethodPage() {
     <Page current="/method">
       <section className="prose-wrap page-head">
         <h1 className="h-section">
-          <span>How it works.</span>
-          <span className="second">What the AI does, and how we test it.</span>
+          <span>Method.</span>
+          <span className="second">How it works, and how we test it.</span>
         </h1>
         <nav className="toc" aria-label="On this page">
           {sections.map(([id, t]) => (
@@ -41,16 +41,12 @@ export function MethodPage() {
       </section>
       <article className="prose-wrap prose">
         <p>
-          <strong>In plain terms.</strong> Machines that pull CO2 out of the air (direct air capture) need a sponge-like material
-          that grabs CO2 and holds it. Metal–organic frameworks (MOFs) are promising sponges: crystals full of pores a few atoms
-          wide. The catch is humidity: in most of them, water takes the spot CO2 needs. Finding the few that work means running a
-          slow, accurate quantum-chemistry simulation (DFT) on each candidate, and a lab can only afford a few dozen.
+          Carbon-capture machines need materials that hold CO2 even in humid air. Testing one candidate accurately takes hours
+          of supercomputer time, so only a few can be tested.
         </p>
         <p>
-          fortyshots is an AI research agent that decides which candidates are worth those expensive simulations. It runs on
-          Meta&apos;s open Muse Glimmer 30B model, entirely on a laptop. In each of four rounds it explores the candidates with
-          tools, picks ten to test with a stated probability for each, critiques its picks by looking at structures and charts,
-          and learns from the results. A person approves each batch. Below is exactly how we built and tested it.
+          fortyshots chooses which to test. Meta&apos;s Muse Glimmer 30B plans, picks ten candidates per round with a confidence
+          for each, critiques its picks, and learns from the results. A person approves each batch.
         </p>
 
         <h2 id="task">The task</h2>

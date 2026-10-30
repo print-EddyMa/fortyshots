@@ -260,32 +260,30 @@ export function ResultsPage() {
     <Page current="/results">
       <section className="wrap page-head">
         <h1 className="h-section">
-          <span>Does it work?</span>
-          <span className="second">A fair test, planned in advance and scored blind.</span>
+          <span>Results.</span>
+          <span className="second">Scored blind against the best existing methods.</span>
         </h1>
         <p className="lede">
-          Each method gets 40 tests to find good CO2-capture materials among 500 candidates, about 14 of which are good. We
-          compare fortyshots with random picking and with simpler methods, on five separate sets. Every number here can be
-          recomputed from the published run logs with one command (<span className="mono">./lab verify</span>), no AI model needed.
+          40 tests, 500 candidates, five independent sets. Every number reproduces with <span className="mono">./lab verify</span>.
         </p>
         {prelim && <Prelim status={R.status} mockRuns={hasMockRuns(index.data)} />}
       </section>
 
       <section className="wrap">
         <div className="stats">
-          <Stat label="fortyshots: good materials found in 40 tests" value={num(a5?.hits_mean, 1)} unit="/ 40" sub={a5 ? `95% CI ${ci(a5.hits_ci[0], a5.hits_ci[1])}, n = ${a5.n_runs} runs` : undefined} />
-          <Stat label="Times better than random" value={num(a5?.enrichment, 1)} unit="×" sub={`base rate ${num(R.base_rate * 100, 1)}%`} />
-          <Stat label="Best simple method (MACE-greedy)" value={num(a2?.hits_mean, 1)} unit="/ 40" sub={a2 ? `machine-learning method (RF-UCB): ${num(a3?.hits_mean, 2)}` : undefined} />
-          <Stat label="Random picking" value={num(a0?.hits_mean, 1)} unit="/ 40" sub={a0 ? `95% CI ${ci(a0.hits_ci[0], a0.hits_ci[1])}, n = ${a0.n_runs}` : undefined} />
-          <Stat label="Are its confidence levels honest?" value={num(R.calibration?.brier, 3)} sub={R.calibration ? `Brier score over ${R.calibration.n} predictions; lower is better` : 'not available yet'} />
-          <Stat label="Claims in its reports that check out" value={R.claims ? R.claims.verified : '—'} unit={R.claims ? `/ ${R.claims.n}` : undefined} sub={R.claims ? `${R.claims.flagged} flagged by the claim checker` : undefined} />
-          <Stat label="Tests until its first good material" value={num(a5?.first_hit_mean, 1)} sub={a0 ? `random: ${num(a0.first_hit_mean, 1)}` : undefined} />
-          <Stat label="Minutes per search, on a laptop" value={num(minutes, 1)} unit="min" sub={a5runs.length ? `mean of ${a5runs.length} runs on the laptop` : undefined} />
+          <Stat label="fortyshots" value={num(a5?.hits_mean, 1)} unit="/ 40" sub={a5 ? `95% CI ${ci(a5.hits_ci[0], a5.hits_ci[1])}, n = ${a5.n_runs} runs` : undefined} />
+          <Stat label="vs. random" value={num(a5?.enrichment, 1)} unit="×" sub={`base rate ${num(R.base_rate * 100, 1)}%`} />
+          <Stat label="Best existing method" value={num(a2?.hits_mean, 1)} unit="/ 40" sub={a2 ? `MACE-greedy · RF-UCB: ${num(a3?.hits_mean, 2)}` : undefined} />
+          <Stat label="Random picks" value={num(a0?.hits_mean, 1)} unit="/ 40" sub={a0 ? `95% CI ${ci(a0.hits_ci[0], a0.hits_ci[1])}, n = ${a0.n_runs}` : undefined} />
+          <Stat label="Confidence accuracy" value={num(R.calibration?.brier, 3)} sub={R.calibration ? `Brier score over ${R.calibration.n} predictions; lower is better` : 'not available yet'} />
+          <Stat label="Verified claims" value={R.claims ? R.claims.verified : '—'} unit={R.claims ? `/ ${R.claims.n}` : undefined} sub={R.claims ? `${R.claims.flagged} flagged by the claim checker` : undefined} />
+          <Stat label="Tests to first find" value={num(a5?.first_hit_mean, 1)} sub={a0 ? `random: ${num(a0.first_hit_mean, 1)}` : undefined} />
+          <Stat label="Minutes per search" value={num(minutes, 1)} unit="min" sub={a5runs.length ? `mean of ${a5runs.length} runs on the laptop` : undefined} />
         </div>
       </section>
 
       <section className="wrap section">
-        <h2 className="fig-title" id="why-hard">Why this is hard</h2>
+        <h2 className="fig-title" id="why-hard">Why it&apos;s hard</h2>
         {pools.data ? (
           (() => {
             const rows = Object.values(pools.data.pools).flat();
@@ -294,9 +292,8 @@ export function ResultsPage() {
             return (
               <>
               <p className="fig-sub">
-                DFT binding energy of CO2 against water for every MOF in the six pools. Water binds more strongly than CO2 in{' '}
-                <span className="callout mono">{Math.round(waterWins * 100)}%</span> of them (above the dashed line), which is why sorbents fail
-                in humid air. Filled: hits, which bind CO2 below −0.5 eV and more strongly than water.
+                In <span className="callout mono">{Math.round(waterWins * 100)}%</span> of materials, water binds more strongly than CO2
+                (above the line). Filled dots are the good ones.
               </p>
               <ScatterChart
                 points={rows.map((r) => ({ x: r.E_H2O, y: r.E_CO2, strong: r.hit, id: r.id }))}
@@ -315,7 +312,7 @@ export function ResultsPage() {
       </section>
 
       <section className="wrap section" id="metals">
-        <h2 className="fig-title">Which metals make good CO2 capturers</h2>
+        <h2 className="fig-title">Best metals</h2>
         <p className="fig-sub">
           Every metal in the six pools, coloured by the share of MOFs containing it that are DFT hits. Each cell: MOFs with that metal ·
           hits. The agent sees the metals; it does not see this table.
@@ -330,7 +327,7 @@ export function ResultsPage() {
       <section className="wrap section">
         <div className="split">
           <div>
-            <h2 className="fig-title">Good materials found with 40 tests, by method</h2>
+            <h2 className="fig-title">Finds per method</h2>
             <p className="fig-sub">Mean and 95% interval (hierarchical bootstrap). Dashed line: random expectation.</p>
             <ArmsChart
               arms={armsSorted.map((a) => ({ key: a.arm, label: ARM_LABEL[a.arm] ?? a.label, mean: a.hits_mean, lo: a.hits_ci[0], hi: a.hits_ci[1], strong: a.arm === 'A5' }))}
@@ -338,7 +335,7 @@ export function ResultsPage() {
             />
           </div>
           <div>
-            <h2 className="fig-title">Found so far, test by test</h2>
+            <h2 className="fig-title">Progress per test</h2>
             <p className="fig-sub">Mean hits after each lookup. Bands are 95% intervals.</p>
             <DiscoveryChart series={curves} height={280} labelWidth={150} />
           </div>
@@ -346,7 +343,7 @@ export function ResultsPage() {
       </section>
 
       <section className="wrap section">
-        <h2 className="fig-title">The statistical tests we committed to in advance</h2>
+        <h2 className="fig-title">Pre-registered tests</h2>
         <p className="fig-sub">
           Primary endpoint: A5 minus A3 in mean hits at 40, pool-stratified permutation test, one-sided. Frozen in{' '}
           <a className="link" href={PREREG_URL}>
@@ -381,7 +378,7 @@ export function ResultsPage() {
       </section>
 
       <section className="wrap section" id="reroll">
-        <h2 className="fig-title">Try the simple methods yourself</h2>
+        <h2 className="fig-title">Try it yourself</h2>
         <p className="fig-sub">Re-roll the cheap baselines on any test pool with your own seed. Same definitions as the pre-registration.</p>
         {pools.data ? <Reroll pools={pools.data} results={R} /> : <p className="muted">{pools.error ?? 'Loading pools…'}</p>}
       </section>
@@ -389,7 +386,7 @@ export function ResultsPage() {
       <section className="wrap section">
         <div className="split">
           <div>
-            <h2 className="fig-title">How good is the quick physics estimate?</h2>
+            <h2 className="fig-title">Estimates vs. simulations</h2>
             <p className="fig-sub">MACE S against DFT S for every MOF in {pp}. Filled: hits. Never shown to the agent.</p>
             <div className="filters">
               <div className="seg seg-sm" role="group" aria-label="Pool">
@@ -411,7 +408,7 @@ export function ResultsPage() {
             )}
           </div>
           <div>
-            <h2 className="fig-title">What the physics models can and cannot tell</h2>
+            <h2 className="fig-title">What physics models miss</h2>
             <p className="fig-sub">Hit-ranking AUC (0.5 is chance) and energy error at the DFT geometry.</p>
             <dl className="kv-list">
               <div>
@@ -449,14 +446,14 @@ export function ResultsPage() {
       <section className="wrap section">
         <div className="split">
           <div>
-            <h2 className="fig-title">Does the AI know what it knows?</h2>
+            <h2 className="fig-title">Confidence</h2>
             <p className="fig-sub">
               Proposer's stated P(hit) against the observed hit rate. Brier {num(R.calibration?.brier, 3)}, n = {R.calibration?.n ?? '—'}.
             </p>
             {R.calibration?.bins.length ? <ReliabilityChart bins={R.calibration.bins} /> : <p className="muted">No calibration data.</p>}
           </div>
           <div>
-            <h2 className="fig-title">Seeing, cheating checks, and honest reports</h2>
+            <h2 className="fig-title">Vision, leakage, claims</h2>
             <p className="fig-sub">Checks that the model reads its plots, is not recalling answers, and cites what it says.</p>
             <dl className="kv-list">
               <div>
@@ -485,7 +482,7 @@ export function ResultsPage() {
       </section>
 
       <section className="wrap section">
-        <h2 className="fig-title">Best possible scores, per set</h2>
+        <h2 className="fig-title">Best possible scores</h2>
         <p className="fig-sub">What a perfect oracle, DFT at the unrelaxed geometry, and random would find with 40 lookups.</p>
         <div className="table-scroll" tabIndex={0}>
           <table className="data">
@@ -519,7 +516,7 @@ export function ResultsPage() {
       </section>
 
       <section className="wrap section">
-        <h2 className="fig-title">Every material it tested</h2>
+        <h2 className="fig-title">Every test</h2>
         <p className="fig-sub">From the ledger of each Glimmer agent run.</p>
         {index.data && pools.data ? <HitsAndMisses index={index.data} pools={pools.data} /> : <p className="muted">Loading…</p>}
       </section>
