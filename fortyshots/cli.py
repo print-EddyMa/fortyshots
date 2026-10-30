@@ -25,8 +25,8 @@ def _run_args(p: argparse.ArgumentParser, single: bool):
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--data-dir", default=None)
     p.add_argument("--no-vision", action="store_true", help="critic gets a text parity table instead of images")
-    p.add_argument("--shared-tools", action="store_true",
-                   help="send the tool list to the proposer too (tool_choice none); enable only if doctor says ok")
+    p.add_argument("--no-shared-tools", dest="shared_tools", action="store_false", default=True,
+                   help="send the tool list only to the director (breaks prefix caching for the other roles)")
     p.add_argument("--cassette", choices=["off", "record", "replay"], default="record")
     p.add_argument("--cassette-from", default=None, help="cassette file to replay (with --cassette replay)")
     p.add_argument("--chemist", action="store_true", help="ask the Chemist for mutation specs after the campaign")

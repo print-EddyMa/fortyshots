@@ -24,7 +24,7 @@ from .cassette import Cassette
 from .config import BATCH, BUDGET, DEFAULT_BASE_URL, DEFAULT_MAX_MINUTES, GOAL, MAX_DIRECTOR_CALLS, ROUNDS
 from .data import load_id_map
 from .ledger import Ledger
-from .llm import ContextOverflow, LLMClient, LLMError, LLMResult, doctor_speeds, image_part
+from .llm import ContextOverflow, LLMClient, LLMError, LLMResult, RequestRejected, doctor_speeds, image_part
 from .roles import prompts as P
 from .roles.schemas import (
     Batch,
@@ -59,6 +59,10 @@ class CampaignStop(Exception):
     """Stops the campaign early. The harness autofills the rest of the budget and the run counts (PREREG section 4)."""
 
 
+class ToolsRejected(Exception):
+    """The server refused a non-Director request that carried the shared tool list; resend it without tools."""
+
+
 class TimeUp(CampaignStop):
     pass
 
@@ -84,7 +88,7 @@ class RunConfig:
     runs_dir: Path = Path("runs")
     data_dir: Path = Path("data")
     vision: bool = True
-    shared_tools: bool = False
+    shared_tools: bool = True  # same tool list on every call keeps the prompt prefix cached (pilot: ~35K re-read tokens)
     cassette: str = "record"
     cassette_from: Path | None = None
     chemist: bool = False
@@ -264,7 +268,7 @@ class Campaign:
             return None, None
         if role == "director":
             return tool_schemas(self.env.tools), "auto"
-        if self.cfg.shared_tools and role in ("proposer",):
+        if self.cfg.shared_tools and role in ("proposer", "critic", "reporter"):
             return tool_schemas(self.env.tools), "none"
         return None, None
 
@@ -280,7 +284,13 @@ class Campaign:
         limit = max_tokens or MAX_TOKENS.get(role, 2048)
         lr = log_role or role
         try:
-            res = self._send(role, lr, messages, cid, schema, tools, tool_choice, strength, limit, may_retry=True)
+            try:
+                res = self._send(role, lr, messages, cid, schema, tools, tool_choice, strength, limit, may_retry=True)
+            except ToolsRejected:
+                self.cfg.shared_tools = False  # for the rest of the run: only the Director gets tools
+                tools = tool_choice = None
+                cid = self.next_cid()
+                res = self._send(role, lr, messages, cid, schema, None, None, strength, limit, may_retry=True)
             if not res.truncated:
                 return res, cid
             cause = "length"
@@ -315,6 +325,8 @@ class Campaign:
                 ev = self.ledger.emit("error", "system", prior["payload"], prior["round"], call_id=cid)
                 if ev["payload"].get("cause") == "context":
                     raise ContextOverflow(ev["payload"].get("message", "context overflow"))
+                if ev["payload"].get("cause") == "tools_rejected":
+                    raise ToolsRejected()
                 failures += 1
             else:
                 try:
@@ -326,6 +338,16 @@ class Campaign:
                     self.error(f"{role}.llm", f"context overflow ({e}); {what}", recovered=may_retry, call_id=cid,
                                cause="context")
                     raise
+                except RequestRejected as e:
+                    if tools and role != "director":
+                        self.error(f"{role}.llm", f"{e}; resending without the shared tool list", recovered=True,
+                                   call_id=cid, cause="tools_rejected")
+                        raise ToolsRejected() from e
+                    failures += 1
+                    last = failures >= n_attempts
+                    self.error(f"{role}.llm", f"{e} (attempt {failures} of {n_attempts}; "
+                                              f"{'giving up' if last else 'retrying'})",
+                               recovered=not last, call_id=cid, cause="transport", attempt=failures)
                 except LLMError as e:
                     failures += 1
                     last = failures >= n_attempts
@@ -650,7 +672,8 @@ class Campaign:
         schema = ("Review", review_schema(ids, self.tool_cids))
         review, errors = None, []
         for attempt in range(3):
-            res, _ = self.llm_call("critic", msgs, schema=schema)
+            tools, choice = self.role_tools("critic")
+            res, _ = self.llm_call("critic", msgs, schema=schema, tools=tools, tool_choice=choice)
             try:
                 rv = Review.model_validate_json(_strip_fences(res.content))
                 bad = [v.id for v in rv.vetoes if v.id not in ids]
@@ -780,7 +803,8 @@ class Campaign:
             msgs = [self.system_msg(self.n_rounds),
                     {"role": "user", "content": P.REPORTER.format(evidence=self.evidence_digest())}]
             try:
-                res, _ = self.llm_call("reporter", msgs)
+                tools, choice = self.role_tools("reporter")
+                res, _ = self.llm_call("reporter", msgs, tools=tools, tool_choice=choice)
                 text = res.content.strip() or None
                 if text is None:
                     self.error("reporter", "empty report; using the template report", recovered=False)

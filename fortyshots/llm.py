@@ -34,6 +34,11 @@ class LLMError(RuntimeError):
     pass
 
 
+class RequestRejected(LLMError):
+    """HTTP 4xx other than a context overflow, 408 or 429: the server refuses this request shape, so resending it
+    unchanged cannot help."""
+
+
 class ContextOverflow(LLMError):
     """llama-server refused the prompt because it does not fit n_ctx (HTTP 400, "exceeds the available context
     size"). Deterministic for a given prompt, so the caller shrinks the prompt instead of resending it."""
@@ -242,6 +247,8 @@ class LLMClient:
                     continue
                 if r.status_code in (400, 413) and CONTEXT_OVERFLOW.search(r.text):
                     raise ContextOverflow(f"HTTP {r.status_code} from {path}: {r.text[:300]}")
+                if 400 <= r.status_code < 500 and r.status_code not in (408, 429):
+                    raise RequestRejected(f"HTTP {r.status_code} from {path}: {r.text[:300]}")
                 if r.status_code >= 400:
                     raise LLMError(f"HTTP {r.status_code} from {path}: {r.text[:300]}")
                 return r.json()

@@ -392,3 +392,21 @@ def test_lab_warns_but_accepts_an_unknown_build(tmp_path):
         fake.chmod(0o755)
         out = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env, check=False)
         assert out.returncode == rc and all(x in out.stdout for x in expect), (version, out.stdout, out.stderr)
+
+
+# ---- shared tool list rejected by the server: resend without tools, keep going ---------------------------------------
+def test_rejected_shared_tools_fall_back_without_aborting(tmp_path):
+    """If llama-server refuses tools together with a schema (or images) on a non-Director call, the call is resent
+    without tools, the rest of the run stops sending them, and the campaign still finishes with every lookup."""
+    def hook(req, resp):
+        has_schema = (req.get("response_format") or {}).get("type") == "json_schema"
+        if req.get("tools") and has_schema:
+            return httpx.Response(400, json={"error": {"code": 400, "message": "tools with response_format not supported"}})
+        return None
+
+    summary, camp = run(make_cfg(tmp_path, "A5"), run_id=RUN_ID, transport=MockTransport(hook=hook))
+    evs = events(camp.run_dir)
+    rejected = [e for e in evs if e["kind"] == "error" and e["payload"].get("cause") == "tools_rejected"]
+    assert len(rejected) == 1 and rejected[0]["payload"]["recovered"]
+    assert summary["spent"] == 40 and not summary["aborted"] and summary["harness_picks"] == 0
+    assert camp.cfg.shared_tools is False
