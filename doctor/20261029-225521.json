@@ -1,0 +1,36 @@
+{
+  "kind": "doctor",
+  "ts": "20261029-225521",
+  "lab_version": 1,
+  "mock": false,
+  "verdict": "swap",
+  "profile": "default",
+  "profile_spec": {
+    "quant": "UD-Q3_K_XL",
+    "ctx": 32768,
+    "est_total_gb": 17.5,
+    "draft": "dflash-Muse-Glimmer-30B-Q4_K_M.gguf"
+  },
+  "server_cmd": "llama-server -m /Users/eddyma/glimmer/Muse-Glimmer-30B-UD-Q3_K_XL.gguf --mmproj /Users/eddyma/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf -md /Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf -ngld 99 -c 32768 -a muse-glimmer-30b -ngl 99 -np 1 --jinja --temp 1.0 --top-p 0.95 --top-k 64 --reasoning-budget 1024 --cache-ram 1024 --ctx-checkpoints 8 --image-max-tokens 1024 --metrics --host 127.0.0.1 --port 8080 ",
+  "llama_build": 11960,
+  "load_s": 21,
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 24,
+    "os": "macOS 26.5.2"
+  },
+  "memory": {
+    "wired_limit_mb": 20480,
+    "recommended_max_working_set_mb": "",
+    "gpu_layers": "",
+    "swap_before_mb": 7049,
+    "swap_after_mb": 10137,
+    "swap_max_growth_mb": 3088,
+    "swap_limit_mb": 3072,
+    "free_pct_before": 82,
+    "free_pct_after": 6
+  },
+  "network": "on",
+  "fortyshots_exit": 143,
+  "fortyshots": null
+}
