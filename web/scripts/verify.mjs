@@ -95,7 +95,8 @@ for (const vp of [
   check('console replays at 32x to completion', state.phase === 'done' && /40/.test(state.lookups ?? ''), `${secs.toFixed(1)} s, ${state.lookups}`);
   check('console: no errors during replay', errs.length === 0, errs.slice(0, 3).join(' | '));
   check('morph plays on reveal', morphed && !!state.morphedAttr, state.caption ?? '');
-  check('trace shows report, claimcheck, summary; flags in --fail; error events visible', state.trace === 3 && state.flagged >= 1 && state.errorItems >= 1, JSON.stringify(state));
+  const nErrors = readFileSync(join(DOCS, `data/runs/${showcase}/events.jsonl`), 'utf8').split('\n').filter((l) => l.includes('"kind": "error"') || l.includes('"kind":"error"')).length;
+  check('trace shows report, claimcheck, summary; flags in --fail; every error event visible', state.trace === 3 && state.flagged >= 1 && state.errorItems >= Math.min(1, nErrors), JSON.stringify({ ...state, nErrors }));
   await page.screenshot({ path: join(OUT, 'console-end-1440.png') });
 
   await ctx.close();

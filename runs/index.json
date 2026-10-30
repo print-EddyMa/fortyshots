@@ -1,0 +1,72 @@
+[
+ {
+  "run_id": "A5-P0-s0-202610301238",
+  "arm": "A5",
+  "pool": "P0",
+  "seed": 0,
+  "mode": "recorded",
+  "hits": 0,
+  "spent": 40,
+  "duration_s": 5105.1,
+  "started": "2026-10-30T12:38:54.288Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false,
+  "goal": "Find MOFs that bind CO2 more strongly than water, from humid air"
+ },
+ {
+  "run_id": "A5-P0-s1-202610301403",
+  "arm": "A5",
+  "pool": "P0",
+  "seed": 1,
+  "mode": "recorded",
+  "hits": 1,
+  "spent": 40,
+  "duration_s": 6001.6,
+  "started": "2026-10-30T14:03:59.850Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false,
+  "goal": "Find MOFs that bind CO2 more strongly than water, from humid air"
+ },
+ {
+  "run_id": "A5-P0-s3-202610301718",
+  "arm": "A5",
+  "pool": "P0",
+  "seed": 3,
+  "mode": "recorded",
+  "hits": 1,
+  "spent": 40,
+  "duration_s": 4129.5,
+  "started": "2026-10-30T17:18:32.439Z",
+  "model": "muse-glimmer-30b",
+  "showcase": true,
+  "goal": "Find MOFs that bind CO2 more strongly than water, from humid air"
+ },
+ {
+  "run_id": "A5-P0-s4-202610301827",
+  "arm": "A5",
+  "pool": "P0",
+  "seed": 4,
+  "mode": "recorded",
+  "hits": 1,
+  "spent": 40,
+  "duration_s": 3482.1,
+  "started": "2026-10-30T18:27:22.283Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false,
+  "goal": "Find MOFs that bind CO2 more strongly than water, from humid air"
+ },
+ {
+  "run_id": "A5-P0-s5-202610301925",
+  "arm": "A5",
+  "pool": "P0",
+  "seed": 5,
+  "mode": "recorded",
+  "hits": 0,
+  "spent": 40,
+  "duration_s": 3633.3,
+  "started": "2026-10-30T19:25:24.702Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false,
+  "goal": "Find MOFs that bind CO2 more strongly than water, from humid air"
+ }
+]

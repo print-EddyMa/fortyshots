@@ -1,7 +1,7 @@
 {
- "generated": "2026-10-29T22:36:33Z",
+ "generated": "2026-10-30T20:47:07Z",
  "status": "pilot",
- "prereg_sha": "unfrozen",
+ "prereg_sha": "10515029b18048f3561df7b7f5204974779a47b9",
  "budget": 40,
  "base_rate": 0.028,
  "pools": [

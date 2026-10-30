@@ -1,6 +1,6 @@
 {
- "at": "2026-10-30T14:02:05.343Z",
- "showcase": "mock-A5-P1-s0-202610291830",
+ "at": "2026-10-30T20:51:58.934Z",
+ "showcase": "A5-P0-s3-202610301718",
  "results": [
   {
    "name": "no console errors: landing @1440",
@@ -80,7 +80,7 @@
   {
    "name": "console replays at 32x to completion",
    "ok": true,
-   "detail": "16.0 s, lookups 40 / 40"
+   "detail": "12.2 s, lookups 40 / 40"
   },
   {
    "name": "console: no errors during replay",
@@ -90,12 +90,12 @@
   {
    "name": "morph plays on reveal",
    "ok": true,
-   "detail": "m858b58a · C24H9O8Zn2 · 172 atoms · DFT-relaxed geometry, ODAC23"
+   "detail": "m869e893 · C4NdO8 · 52 atoms · DFT-relaxed geometry, ODAC23"
   },
   {
-   "name": "trace shows report, claimcheck, summary; flags in --fail; error events visible",
+   "name": "trace shows report, claimcheck, summary; flags in --fail; every error event visible",
    "ok": true,
-   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793368914775\",\"caption\":\"m858b58a · C24H9O8Zn2 · 172 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":1,\"errorItems\":1}"
+   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793393509622\",\"caption\":\"m869e893 · C4NdO8 · 52 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":4,\"errorItems\":0,\"nErrors\":0}"
   },
   {
    "name": "queue (static): j/r/a marks 2 picks, sends one reject decision, saved locally",
@@ -110,22 +110,22 @@
   {
    "name": "results: re-roll A0/A1/A2 under 1 s",
    "ok": true,
-   "detail": "43 ms incl. render"
+   "detail": "42 ms incl. render"
   },
   {
    "name": "live: events stream over SSE",
    "ok": true,
-   "detail": "live · batch awaiting approval, 7 trace items"
+   "detail": "live · batch awaiting approval, 8 trace items"
   },
   {
    "name": "live: queue POSTs one decision per round to /api/runs/<id>/human",
    "ok": true,
-   "detail": "[{\"round\":1,\"action\":\"approve\",\"ids\":[],\"note\":\"approve from the console\"},{\"round\":2,\"action\":\"reject\",\"ids\":[\"m952c191\"],\"note\":\"reject from the console\"}]"
+   "detail": "[{\"round\":1,\"action\":\"approve\",\"ids\":[],\"note\":\"approve from the console\"},{\"round\":2,\"action\":\"reject\",\"ids\":[\"m392c9b2\"],\"note\":\"reject from the console\"}]"
   },
   {
    "name": "live: decisions come back through the ledger stream",
    "ok": true,
-   "detail": "Human gateapprove18:32:51approve 10 · approve from the console | Human gatereject18:35:38reject 1 · reject from the console"
+   "detail": "Human gateapprove17:35:09approve 10 · approve from the console | Human gatereject17:49:41reject 1 · reject from the console"
   },
   {
    "name": "live: no console errors",
