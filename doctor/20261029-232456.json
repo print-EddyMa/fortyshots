@@ -1,0 +1,297 @@
+{
+  "kind": "doctor",
+  "ts": "20261029-232456",
+  "lab_version": 1,
+  "mock": false,
+  "verdict": "fail",
+  "profile": "lean",
+  "profile_spec": {
+    "quant": "UD-Q3_K_XL",
+    "ctx": 32768,
+    "est_total_gb": 16.1,
+    "draft": "dflash-Muse-Glimmer-30B-Q4_K_M.gguf"
+  },
+  "server_cmd": "llama-server -m /Users/eddyma/glimmer/Muse-Glimmer-30B-UD-Q3_K_XL.gguf -md /Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf -ngld 99 -c 32768 -a muse-glimmer-30b -ngl 99 -np 1 --jinja --temp 1.0 --top-p 0.95 --top-k 64 --reasoning-budget 1024 --cache-ram 1024 --ctx-checkpoints 8 --image-max-tokens 1024 --metrics --host 127.0.0.1 --port 8080 ",
+  "llama_build": 11960,
+  "load_s": 6,
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 24,
+    "os": "macOS 26.5.2"
+  },
+  "memory": {
+    "wired_limit_mb": 20480,
+    "recommended_max_working_set_mb": "",
+    "gpu_layers": "",
+    "swap_before_mb": 10021,
+    "swap_after_mb": 8005,
+    "swap_max_growth_mb": 0,
+    "swap_limit_mb": 3072,
+    "free_pct_before": 80,
+    "free_pct_after": 10
+  },
+  "network": "on",
+  "fortyshots_exit": 1,
+  "fortyshots": {
+    "generated": "2026-10-30T03:41:58+00:00",
+    "base_url": "http://127.0.0.1:8080",
+    "model": {
+      "gguf": "Muse-Glimmer-30B-UD-Q3_K_XL.gguf",
+      "sha256": "820d18e00c59376331eba62dd716a6bcdcaa305c2316f5da3a2fab36c7c37e15",
+      "server_build": "b11960-8642541b2",
+      "n_ctx": 32768
+    },
+    "machine": {
+      "chip": "Apple M4",
+      "ram_gb": 24.0,
+      "os": "macOS 26.5.2"
+    },
+    "network": "on",
+    "checks": [
+      {
+        "name": "server",
+        "ok": true,
+        "required": true,
+        "detail": {
+          "model_path": "/Users/eddyma/glimmer/Muse-Glimmer-30B-UD-Q3_K_XL.gguf",
+          "build_info": "b11960-8642541b2",
+          "n_ctx": 32768,
+          "total_slots": 1,
+          "modalities": {
+            "vision": false,
+            "video": false,
+            "audio": false
+          },
+          "models": [
+            "muse-glimmer-30b"
+          ]
+        },
+        "dur_ms": 4
+      },
+      {
+        "name": "plain_chat",
+        "ok": true,
+        "required": true,
+        "detail": {
+          "content": "READY",
+          "prompt_n": 64,
+          "cache_n": 0,
+          "prompt_ms": 2815.35,
+          "prompt_per_second": 22.732519935354397,
+          "predicted_n": 52,
+          "predicted_per_second": 6.934615684278643,
+          "finish_reason": "stop",
+          "reasoning_chars": 188,
+          "dur_ms": 10172
+        },
+        "dur_ms": 10172
+      },
+      {
+        "name": "tool_call",
+        "ok": true,
+        "required": true,
+        "detail": {
+          "tool_calls": [
+            {
+              "name": "add",
+              "args": {
+                "a": 17,
+                "b": 25
+              }
+            },
+            {
+              "name": "add",
+              "args": {
+                "a": 3,
+                "b": 4
+              }
+            }
+          ],
+          "parallel": true,
+          "prompt_n": 426,
+          "cache_n": 0,
+          "prompt_ms": 14084.894,
+          "prompt_per_second": 30.24516904422568,
+          "predicted_n": 203,
+          "predicted_per_second": 6.61973992024983,
+          "finish_reason": "tool_calls",
+          "reasoning_chars": 295,
+          "dur_ms": 44611
+        },
+        "dur_ms": 44611
+      },
+      {
+        "name": "parallel_tool_calls",
+        "ok": true,
+        "required": false,
+        "detail": {
+          "n_calls_in_one_turn": 2
+        },
+        "dur_ms": 0
+      },
+      {
+        "name": "tool_roundtrip",
+        "ok": true,
+        "required": true,
+        "detail": {
+          "content": "The result of 17 + 25 is **42**.\n\nTool output: `add: 42`\n",
+          "n_tool_calls": 0,
+          "prompt_n": 108,
+          "cache_n": 394,
+          "prompt_ms": 4279.602,
+          "prompt_per_second": 25.235991571178815,
+          "predicted_n": 69,
+          "predicted_per_second": 5.898722917813701,
+          "finish_reason": "stop",
+          "reasoning_chars": 125,
+          "dur_ms": 15818
+        },
+        "dur_ms": 15818
+      },
+      {
+        "name": "json_schema",
+        "ok": true,
+        "required": true,
+        "detail": {
+          "content": "{\"answer\": 391}",
+          "answer": 391,
+          "prompt_n": 19,
+          "cache_n": 49,
+          "prompt_ms": 1343.552,
+          "prompt_per_second": 14.141618634783024,
+          "predicted_n": 100,
+          "predicted_per_second": 5.821848609824881,
+          "finish_reason": "stop",
+          "reasoning_chars": 294,
+          "dur_ms": 18377
+        },
+        "dur_ms": 18377
+      },
+      {
+        "name": "json_schema_with_tools",
+        "ok": true,
+        "required": false,
+        "detail": {
+          "content": "{\"answer\": 391}",
+          "answer": 391,
+          "prompt_n": 19,
+          "cache_n": 394,
+          "prompt_ms": 1393.892,
+          "prompt_per_second": 13.63089823314862,
+          "predicted_n": 95,
+          "predicted_per_second": 5.664380968427162,
+          "finish_reason": "stop",
+          "reasoning_chars": 285,
+          "dur_ms": 18002
+        },
+        "dur_ms": 18002
+      },
+      {
+        "name": "lab_batch_schema",
+        "ok": true,
+        "required": false,
+        "detail": {
+          "picks": [
+            "m00c42cb",
+            "m00ea87c",
+            "m00fc529"
+          ],
+          "prompt_n": 215,
+          "cache_n": 49,
+          "prompt_ms": 7386.917,
+          "prompt_per_second": 29.105511812302748,
+          "predicted_n": 335,
+          "predicted_per_second": 6.105051410930388,
+          "finish_reason": "stop",
+          "reasoning_chars": 622,
+          "dur_ms": 62115
+        },
+        "dur_ms": 62367
+      },
+      {
+        "name": "vision",
+        "ok": false,
+        "required": true,
+        "detail": {
+          "error": "LLMError: HTTP 500 from /v1/chat/completions: {\"error\":{\"code\":500,\"message\":\"image input is not supported - hint: if this is unexpected, you may need to provide the mmproj\",\"type\":\"server_error\"}}"
+        },
+        "dur_ms": 50
+      },
+      {
+        "name": "vision_parity_reading",
+        "ok": false,
+        "required": false,
+        "detail": {
+          "error": "LLMError: HTTP 500 from /v1/chat/completions: {\"error\":{\"code\":500,\"message\":\"image input is not supported - hint: if this is unexpected, you may need to provide the mmproj\",\"type\":\"server_error\"}}"
+        },
+        "dur_ms": 98
+      },
+      {
+        "name": "reasoning_budget",
+        "ok": true,
+        "required": true,
+        "detail": {
+          "budget": 1024,
+          "within_budget": true,
+          "low": {
+            "reasoning_tokens": 203,
+            "content_chars": 401,
+            "prompt_n": 83,
+            "cache_n": 49,
+            "prompt_ms": 3332.703,
+            "prompt_per_second": 24.904709480562776,
+            "predicted_n": 292,
+            "predicted_per_second": 5.298541591903668,
+            "finish_reason": "stop",
+            "reasoning_chars": 925,
+            "dur_ms": 58267
+          },
+          "high": {
+            "reasoning_tokens": 712,
+            "content_chars": 322,
+            "prompt_n": 132,
+            "cache_n": 0,
+            "prompt_ms": 4801.936,
+            "prompt_per_second": 27.488912805168585,
+            "predicted_n": 789,
+            "predicted_per_second": 5.771523321509913,
+            "finish_reason": "stop",
+            "reasoning_chars": 3235,
+            "dur_ms": 141348
+          }
+        },
+        "dur_ms": 199638
+      },
+      {
+        "name": "throughput",
+        "ok": false,
+        "required": false,
+        "detail": {
+          "error": "LLMError: HTTP 500 from /v1/chat/completions: {\"error\":{\"code\":500,\"message\":\"image input is not supported - hint: if this is unexpected, you may need to provide the mmproj\",\"type\":\"server_error\"}}"
+        },
+        "dur_ms": 638172
+      }
+    ],
+    "estimate": null,
+    "recommendations": {
+      "shared_tools": true,
+      "action_mode": "native",
+      "vision": false
+    },
+    "ok": false,
+    "summary": {
+      "server": true,
+      "plain_chat": true,
+      "tool_call": true,
+      "parallel_tool_calls": true,
+      "tool_roundtrip": true,
+      "json_schema": true,
+      "json_schema_with_tools": true,
+      "lab_batch_schema": true,
+      "vision": false,
+      "vision_parity_reading": false,
+      "reasoning_budget": true,
+      "throughput": false
+    }
+  }
+}
