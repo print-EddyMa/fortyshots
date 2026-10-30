@@ -1,6 +1,6 @@
 {
   "name": "second",
-  "description": "Nov 1 night. A6 (agent without fit_surrogate) on P1-P5 seed 0, then A5 seed 1 on P1-P5.",
+  "description": "Night 2. A6 on P1-P3 seed 0 (PREREG section 7), then exploratory A5 seed 1 on P1-P5 if time remains (reported separately).",
   "runs": [
     {
       "arm": "A6",
@@ -15,16 +15,6 @@
     {
       "arm": "A6",
       "pool": "P3",
-      "seed": 0
-    },
-    {
-      "arm": "A6",
-      "pool": "P4",
-      "seed": 0
-    },
-    {
-      "arm": "A6",
-      "pool": "P5",
       "seed": 0
     },
     {

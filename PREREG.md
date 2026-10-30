@@ -1,6 +1,6 @@
 # fortyshots pre-registration
 
-**Status: DRAFT, not frozen.** It becomes binding when the commit that contains it is tagged `prereg-v1`, before any campaign on a test pool (P1–P5) is recorded. Edits after the tag go in `DEVIATIONS.md`, never here.
+**Status: FROZEN (Oct 30, 2026).** Binding from the commit tagged `prereg-v1`, before any campaign on a test pool (P1–P5) was recorded. Edits after the tag go in `DEVIATIONS.md`, never here.
 
 ## 1. Question
 
@@ -97,6 +97,17 @@ Throughput is measured by `./lab doctor` and the P0 pilot, and k is fixed at the
 | ≤ 15 min | k = 3 (15 runs) | k = 1 | k = 2 |
 | ≤ 25 min | k = 2 (10 runs) | k = 1 | k = 1 |
 | > 25 min | k = 1 (5 runs) | k = 1 | k = 1, on P1–P3 only |
+
+**Fixed at the freeze.** The P0 pilot campaigns took a median of about 60 minutes on the laptop (base Apple M4, 24 GB), so the last row applies:
+- A5: seed 0 on P1–P5 (5 runs; the primary test uses these).
+- A4: seed 0 on P1–P5 (5 runs).
+- A6: seed 0 on P1–P3 (3 runs).
+- L and L2: once each, on P1.
+- Exploratory, only if laptop time remains after all of the above: A5 seed 1 on P1–P5. Reported separately and labelled exploratory; never part of the primary test.
+
+**Frozen agent settings** (in every run header, `header.config`): Muse Glimmer 30B, unsloth UD-Q3_K_XL GGUF with Meta's mmproj vision encoder and DFlash drafter, llama.cpp `llama-server` (profile `default` in `mac/profiles.json`); every role at `reasoning_strength` low; at most 3 Director tool calls per round; the shared tool list on every call; tools as in `fortyshots/tools.py` (A5 adds `similar_to` and `fit_surrogate`); prompts as in `fortyshots/roles/prompts.py` at the tagged commit; 120-minute cap.
+
+**Pilot log (dev pool P0, never analysed).** Seven P0 campaigns were used to tune speed and prompts before the freeze: seeds 0–2 (original settings, 85–100 min), seeds 3–5 (lower reasoning for Director and Critic, Director cap 3; 58–69 min). Hits: 0, 1, (seed 2 interrupted), 1, 1, 0. The final settings above (one strength for every role, `similar_to`, the search-strategy prompt) were changed after seed 5 and were not piloted on the laptop; they pass the mock test suite. Pilot ledgers are published under `runs/` with pool P0.
 
 Recording order per night: A5 first, then A4, A6, L. A run that crashes is resumed from its last checkpoint. A model call that failed before the crash is sent again; its logged failures do not end the run. A run that cannot finish within the 120-minute cap is logged as aborted and counts (§4). Runs are never re-rolled.
 
