@@ -36,7 +36,8 @@ SERVE_PORT="${LAB_SERVE_PORT:-7777}"
 BASE_URL="http://127.0.0.1:$PORT"
 MOCK="${LAB_MOCK:-0}"
 OS="$(uname -s)"
-SWAP_LIMIT_MB=3072        # doctor switches profile above this swap growth (bench: +1.9 GB on default with decode unaffected)
+SWAP_LIMIT_MB=12288       # doctor switches profile only above this swap growth. llama.cpp's Metal buffers are wired and
+                          # never swap, so growth is macOS paging out other apps; decode held 6-7 tok/s at +3 GB (Oct 29).
 REHEARSE_SWAP_MB=512      # rehearsal warns above this
 MIN_LLAMA_BUILD=10353     # first llama.cpp release with Muse Glimmer
 MAX_FILE_BYTES="${LAB_MAX_FILE_BYTES:-99614720}"   # 95 MB: GitHub rejects files over 100 MB (override only for tests)
@@ -465,6 +466,15 @@ EOF
 
 stop_server() { stop_pidfile "$STATE/server.pid" "model server" || true; rm -f "$STATE/server.profile"; }
 
+cmd_use() {  # cmd_use profile -> make it the default for model, doctor, pilot and record
+  local prof="${1:-}"
+  [ -n "$prof" ] || die "Which profile? ($(H profiles "$PROFILES" | cut -f1 | tr '\n' ' '))" "./lab use default"
+  check_profile "$prof"
+  mkdir -p "$STATE"; echo "$prof" > "$STATE/profile"
+  ok "Default profile is now $prof: $(H profile "$PROFILES" "$prof" description)"
+  check_files_quiet "$prof" || warn "Its model files are not all downloaded yet: ./lab download $prof"
+}
+
 cmd_stop() {
   step "Stopping"
   stop_pidfile "$STATE/serve.pid" "live console" || true
@@ -705,7 +715,7 @@ cmd_doctor() {
   ok "Report: doctor/$ts.json"
   if [ "$verdict" = swap ]; then
     push_runs all || true
-    [ -n "$fb" ] || die "Swap grew past 3 GB even on the smallest profile ($prof)." \
+    [ -n "$fb" ] || die "Swap grew past $(mb_to_gb "$SWAP_LIMIT_MB") GB even on the smallest profile ($prof)." \
       "Quit other apps (browser, Slack), restart the Mac, then: sudo sysctl iogpu.wired_limit_mb=20480 && ./lab doctor"
     echo "$fb" > "$STATE/profile"
     warn "Swap grew by $(mb_to_gb "$maxg") GB on profile $prof. Switched the default profile to $fb."
@@ -1369,6 +1379,7 @@ Recording:
 Model:
   ./lab model [profile]         start llama-server in the background (log: $SERVER_LOG)
   ./lab stop                    stop the model server, the console and keep-awake
+  ./lab use <profile>           make a profile the default (also undoes an automatic switch by doctor)
 
 Sharing and checking:
   ./lab push                    push runs/ and doctor/ to branch runs-mac (prints pushed or NOT PUSHED)
@@ -1395,6 +1406,7 @@ main() {
     bench) cmd_bench "$@" ;;
     model) cmd_model "$@" ;;
     stop) cmd_stop ;;
+    use) cmd_use "$@" ;;
     doctor) cmd_doctor "$@" ;;
     pilot) cmd_record pilot ;;
     record) cmd_record "$@" ;;
