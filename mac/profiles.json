@@ -4,19 +4,30 @@
   "wired_limit_mb": 20480,
   "port": 8080,
   "common_flags": [
-    "-a", "muse-glimmer-30b",
-    "-ngl", "99",
-    "-np", "1",
+    "-a",
+    "muse-glimmer-30b",
+    "-ngl",
+    "99",
+    "-np",
+    "1",
     "--jinja",
-    "--temp", "1.0",
-    "--top-p", "0.95",
-    "--top-k", "64",
-    "--reasoning-budget", "1024",
-    "--cache-ram", "1024",
-    "--ctx-checkpoints", "8",
-    "--image-max-tokens", "1024",
+    "--temp",
+    "1.0",
+    "--top-p",
+    "0.95",
+    "--top-k",
+    "64",
+    "--reasoning-budget",
+    "1024",
+    "--cache-ram",
+    "1024",
+    "--ctx-checkpoints",
+    "8",
+    "--image-max-tokens",
+    "1024",
     "--metrics",
-    "--host", "127.0.0.1"
+    "--host",
+    "127.0.0.1"
   ],
   "files": {
     "q4km": {
@@ -96,7 +107,7 @@
       "fallback": "live"
     },
     "small-dflash": {
-      "description": "small + Meta DFlash drafter. Only for the DFlash speed A/B against small.",
+      "description": "unsloth UD-Q3_K_XL + vision + Meta DFlash drafter, 32K context. Lightest full-featured setup; the likely default on a base M4.",
       "model": "ud_q3kxl",
       "mmproj": "mmproj",
       "draft": "dflash",
@@ -105,7 +116,21 @@
       "est_total_gb": 17.5,
       "headroom_gb": 6.5,
       "fallback": "small"
+    },
+    "q4-dflash": {
+      "description": "Meta Q4_K_M + Meta DFlash drafter, text only, 16K context. Speed test for the drafter on the Meta build.",
+      "model": "q4km",
+      "mmproj": null,
+      "draft": "dflash",
+      "ctx": 16384,
+      "quant": "Q4_K_M",
+      "est_total_gb": 19.9,
+      "headroom_gb": 4.1,
+      "fallback": "small-dflash"
     }
   },
-  "draft_flags": ["-ngld", "99"]
+  "draft_flags": [
+    "-ngld",
+    "99"
+  ]
 }

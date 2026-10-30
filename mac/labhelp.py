@@ -131,6 +131,47 @@ def cmd_chat(base_url):
     print(f"correct={'yes' if '391' in content else 'no'}")
 
 
+_BENCH_ROWS = "\n".join(
+    f"m{i:07x}  Zn{i % 3 + 1}C{8 + i % 9}H{6 + i % 7}O{4 + i % 5}  pld {3.1 + (i % 17) / 10:.1f}  lcd {4.2 + (i % 13) / 10:.1f}"
+    f"  oms {'yes' if i % 4 == 0 else 'no'}  S_mace {-0.9 + (i % 23) / 20:.2f}"
+    for i in range(0, 4000, 97))
+
+
+def _bench_call(base_url, question):
+    body = {
+        "model": "muse-glimmer-30b",
+        "messages": [
+            {"role": "system", "content": "You are the director of a materials-discovery lab. Candidate MOFs:\n" + _BENCH_ROWS},
+            {"role": "user", "content": question},
+        ],
+        "max_tokens": 900, "temperature": 0,
+        "chat_template_kwargs": {"reasoning_strength": "low"},
+    }
+    t0 = time.time()
+    d = _post(base_url.rstrip("/") + "/v1/chat/completions", body, 900)
+    return d, time.time() - t0
+
+
+def cmd_bench(base_url):
+    """Decode and prefill speed on an agent-sized prompt: one cold call, then one that reuses the cached prefix."""
+    if not base_url.startswith(("http://127.0.0.1", "http://localhost")):
+        _die(f"refusing non-loopback url {base_url}")
+    qs = ["Pick the 5 most promising MOFs for humid-air CO2 capture and give one sentence of reasoning for each.",
+          "Now pick 5 different ones, avoiding any you already chose, again with one sentence each."]
+    for tag, q in zip(("cold", "warm"), qs):
+        try:
+            d, dt = _bench_call(base_url, q)
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            _die(f"bench call failed: {e}")
+        t = d.get("timings") or {}
+        ch = (d.get("choices") or [{}])[0]
+        print(f"{tag}.seconds={dt:.1f}")
+        print(f"{tag}.finish_reason={ch.get('finish_reason')}")
+        for k, v in sorted(t.items()):
+            if isinstance(v, (int, float)):
+                print(f"{tag}.{k}={round(v, 3) if isinstance(v, float) else v}")
+
+
 def _coerce(v):
     try:
         return json.loads(v)
@@ -265,6 +306,7 @@ COMMANDS = {
     "files": cmd_files,
     "server-args": cmd_server_args,
     "chat": cmd_chat,
+    "bench": cmd_bench,
     "write-json": cmd_write_json,
     "json-get": cmd_json_get,
     "plan": cmd_plan,

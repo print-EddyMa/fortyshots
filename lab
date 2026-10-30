@@ -157,6 +157,9 @@ llama_build() {
   llama-server --version 2>&1 | awk '
     {
       line = " " $0
+      if (match(line, /build:? *[0-9][0-9][0-9][0-9]+/)) {
+        num = substr(line, RSTART, RLENGTH); sub(/^build:? */, "", num); print num; exit
+      }
       if (match(line, /version: *[0-9]+/)) {
         num = substr(line, RSTART, RLENGTH); sub(/^version: */, "", num)
         if (substr(line, RSTART + RLENGTH, 1) !~ /[A-Za-z0-9.]/) { print num; exit }
@@ -372,6 +375,12 @@ server_log_now() {  # the part of server.log written since the current server st
 metal_wss() { server_log_now | sed -n 's/.*recommendedMaxWorkingSetSize *= *\([0-9.]*\) *MB.*/\1/p' | head -n 1; }
 gpu_layers() { server_log_now | sed -n 's/.*offloaded \([0-9]*\/[0-9]*\) layers to GPU.*/\1/p' | tail -n 1; }
 
+# Memory and offload lines from the current server log, joined with " | ", for reports Claude reads.
+log_excerpt() {
+  server_log_now | grep -i -E 'recommendedMaxWorkingSetSize|offload|buffer size|model size|KV|draft|spec|mmproj|clip|error|failed|n_ctx' \
+    | grep -v -i 'warmup' | head -n 30 | cut -c1-220 | tr '\n' '|' | sed 's/|/ | /g' | tr '"' "'"
+}
+
 metal_report() {
   mock && return 0
   local wss layers a b
@@ -568,10 +577,66 @@ EOF
     "reasoning_chars=${s_rchars:-null}" "decode_tok_s=${s_dec:-null}" "prompt_tok_s=${s_pre:-null}" "call_s=${s_secs:-null}" \
     "memory.swap_before_mb=$swap0" "memory.swap_after_mb=$swap1" "memory.free_pct_before=${mem0:-null}" "memory.free_pct_after=${mem1:-null}" \
     "memory.wired_limit_mb=$(wired_limit_mb)" "memory.recommended_max_working_set_mb=$(metal_wss)" "memory.gpu_layers=$(gpu_layers)" \
-    "network=$(net_state)"
+    "network=$(net_state)" "log_excerpt=$(mock || log_excerpt)"
   ok "Saved doctor/$ts-smoke.json"
   if [ "$keep" = 0 ]; then stop_server; else info "Model left running (./lab stop to stop it)."; fi
   info "Next (tomorrow): ./lab setup"
+  push_runs all || true
+  return 0
+}
+
+# ---------------------------------------------------------------- bench
+
+# Measures decode and prefill speed and memory for several profiles on an agent-sized prompt.
+cmd_bench() {
+  local profs="$*" prof ts out swap0 swap1 mem1 k v
+  [ -n "$profs" ] || profs="small-dflash small default q4-dflash"
+  step "Speed and memory test: $profs"
+  check_platform
+  need_py
+  ts="$(stamp)"
+  mkdir -p "$REPO/doctor"
+  for prof in $profs; do
+    check_profile "$prof"
+    if ! mock && ! check_files_quiet "$prof"; then
+      warn "Skipping $prof: its model files are not downloaded (./lab download $prof)."
+      continue
+    fi
+    stop_server
+    swap0="$(swap_used_mb)"
+    if ! (cmd_model "$prof"); then
+      warn "Profile $prof did not start; see $SERVER_LOG"
+      H write-json "$REPO/doctor/$ts-bench-$prof.json" kind=bench "ts=$ts" "profile=$prof" started=false \
+        "machine.chip=$(machine_chip)" "log_excerpt=$(log_excerpt)"
+      continue
+    fi
+    step "Profile $prof: two calls on a ~2K-token prompt (cold, then cached prefix)"
+    out="$(H bench "$BASE_URL")" || { warn "The bench call failed for $prof."; out=""; }
+    swap1="$(swap_used_mb)"; mem1="$(mem_free_pct)"
+    local -a args=()
+    while IFS='=' read -r k v; do
+      [ -n "$k" ] || continue
+      args+=("bench.$k=$v")
+      case "$k" in
+        cold.predicted_per_second) info "decode, cold:   $v tok/s" ;;
+        warm.predicted_per_second) info "decode, warm:   $v tok/s" ;;
+        cold.prompt_per_second) info "prefill, cold:  $v tok/s" ;;
+        warm.prompt_per_second) info "prefill, warm:  $v tok/s (cached prefix)" ;;
+        *draft*) info "$k: $v" ;;
+      esac
+    done <<BENCH_OUT
+$out
+BENCH_OUT
+    info "swap growth:    $((swap1 - swap0)) MB; memory free after: ${mem1:-?}%"
+    H write-json "$REPO/doctor/$ts-bench-$prof.json" kind=bench "ts=$ts" "profile=$prof" started=true \
+      "quant=$(H profile "$PROFILES" "$prof" quant)" "draft=$(H profile "$PROFILES" "$prof" draft)" \
+      "machine.chip=$(machine_chip)" "machine.ram_gb=$(machine_ram_gb)" "llama_build=$(mock || llama_build)" \
+      "load_s=$(cat "$STATE/server.load_s" 2>/dev/null)" "server_cmd=$(tr '\n' ' ' < "$STATE/server.cmd")" \
+      "memory.swap_growth_mb=$((swap1 - swap0))" "memory.free_pct_after=${mem1:-null}" \
+      "memory.wired_limit_mb=$(wired_limit_mb)" "log_excerpt=$(mock || log_excerpt)" ${args[@]+"${args[@]}"}
+    ok "Saved doctor/$ts-bench-$prof.json"
+    stop_server
+  done
   push_runs all || true
   return 0
 }
@@ -970,6 +1035,9 @@ push_runs() {
   local mode="${1:-all}" wt units u n=0 i ahead sha big
   git rev-parse --git-dir >/dev/null 2>&1 || { not_pushed "This folder is not a git checkout."; return 1; }
   [ -n "$(origin_url)" ] || { not_pushed "No GitHub remote (git remote -v is empty)."; return 1; }
+  if mock && case "$(origin_url)" in /*|file://*) false ;; *) true ;; esac; then
+    info "Mock mode: not pushing to $(origin_url)."; return 0   # mock data never reaches GitHub
+  fi
   remote_reachable || { not_pushed "No network (GitHub is unreachable). Turn Wi-Fi on."; return 1; }
   git fetch -q origin 2>/dev/null || { not_pushed "git fetch failed (GitHub login?). Try: gh auth status"; return 1; }
   wt="$(runs_worktree)"
@@ -1279,6 +1347,7 @@ fortyshots lab $LAB_VERSION: run Muse Glimmer 30B on this Mac and record campaig
 First time (in this order):
   ./lab download [profile...]   download model files to $GLIMMER_DIR (resumable, sha256-checked)
   ./lab smoke [profile]         start llama-server, one chat call, print tok/s, swap and GPU memory
+  ./lab bench [profile...]      decode/prefill speed and memory for each profile (default: four candidates)
   ./lab setup [--dry-run]       check the Mac, install tools, Python env, GitHub login, model files
   ./lab doctor [profile]        full model check; writes doctor/<time>.json and pushes it
   ./lab doctor --rehearse       one live round with browser + screen recording open; warns on swap
@@ -1315,6 +1384,7 @@ main() {
     setup) cmd_setup "$@" ;;
     download) cmd_download "$@" ;;
     smoke) cmd_smoke "$@" ;;
+    bench) cmd_bench "$@" ;;
     model) cmd_model "$@" ;;
     stop) cmd_stop ;;
     doctor) cmd_doctor "$@" ;;
