@@ -36,7 +36,7 @@ SERVE_PORT="${LAB_SERVE_PORT:-7777}"
 BASE_URL="http://127.0.0.1:$PORT"
 MOCK="${LAB_MOCK:-0}"
 OS="$(uname -s)"
-SWAP_LIMIT_MB=1024        # doctor switches profile above this swap growth
+SWAP_LIMIT_MB=3072        # doctor switches profile above this swap growth (bench: +1.9 GB on default with decode unaffected)
 REHEARSE_SWAP_MB=512      # rehearsal warns above this
 MIN_LLAMA_BUILD=10353     # first llama.cpp release with Muse Glimmer
 MAX_FILE_BYTES="${LAB_MAX_FILE_BYTES:-99614720}"   # 95 MB: GitHub rejects files over 100 MB (override only for tests)
@@ -705,7 +705,7 @@ cmd_doctor() {
   ok "Report: doctor/$ts.json"
   if [ "$verdict" = swap ]; then
     push_runs all || true
-    [ -n "$fb" ] || die "Swap grew past 1 GB even on the smallest profile ($prof)." \
+    [ -n "$fb" ] || die "Swap grew past 3 GB even on the smallest profile ($prof)." \
       "Quit other apps (browser, Slack), restart the Mac, then: sudo sysctl iogpu.wired_limit_mb=20480 && ./lab doctor"
     echo "$fb" > "$STATE/profile"
     warn "Swap grew by $(mb_to_gb "$maxg") GB on profile $prof. Switched the default profile to $fb."

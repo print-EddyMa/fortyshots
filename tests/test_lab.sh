@@ -91,10 +91,10 @@ check "  ... pushed" sh -c "git -C '$T/remote.git' ls-tree -r --name-only runs-m
 
 echo "doctor switches profile when swap grows"
 # shellcheck disable=SC2016  # the $ expressions belong to the generated script
-printf '#!/bin/sh\nf="%s/swapcount"; n=$(cat "$f" 2>/dev/null || echo 0); echo $((n + 1)) > "$f"\nif [ "$n" -eq 0 ]; then echo 0; else echo 2000; fi\n' "$T" > "$T/fakeswap"
+printf '#!/bin/sh\nf="%s/swapcount"; n=$(cat "$f" 2>/dev/null || echo 0); echo $((n + 1)) > "$f"\nif [ "$n" -eq 0 ]; then echo 0; else echo 4000; fi\n' "$T" > "$T/fakeswap"
 chmod +x "$T/fakeswap"
 (cd "$R" && ./lab stop >/dev/null 2>&1; LAB_ENFORCE_SWAP=1 LAB_SWAP_CMD="$T/fakeswap" ./lab doctor) > "$T/out" 2>&1; echo $? > "$T/rc"
-check "doctor with 2 GB swap growth fails" [ "$(rc)" = 1 ]
+check "doctor with 4 GB swap growth fails" [ "$(rc)" = 1 ]
 check "  ... switches the default profile to lean" [ "$(cat "$GLIMMER_DIR/.lab/profile" 2>/dev/null)" = lean ]
 check "  ... asks to download the lean files" out_has "Next: ./lab download lean && ./lab doctor"
 check "  ... report says verdict swap" sh -c "grep -l '\"verdict\": \"swap\"' '$R'/doctor/*.json >/dev/null"
