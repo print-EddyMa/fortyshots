@@ -61,9 +61,29 @@ def test_doctor_runs_against_the_mock(tmp_path):
     assert rep["ok"] and json.loads(out.read_text())["summary"]["vision"] is True
     names = {c["name"] for c in rep["checks"]}
     assert {"tool_call", "json_schema", "vision", "reasoning_budget", "throughput"} <= names
-    assert rep["estimate"]["campaign_minutes"] > 0 and rep["estimate"]["seeds_per_pool_k"] in (2, 3, 5)
+    assert rep["estimate"]["campaign_minutes"] > 0 and rep["estimate"]["seeds_per_pool_k"] in (1, 2, 3)
     roles = next(c for c in rep["checks"] if c["name"] == "throughput")["detail"]["roles"]
     assert set(roles) == {"director", "proposer", "critic", "reporter"}
+
+
+def test_doctor_without_vision_skips_image_checks(tmp_path, monkeypatch):
+    """A profile without mmproj: llama-server reports no vision and rejects images; doctor must still pass."""
+    from fortyshots import mockllm
+
+    monkeypatch.setitem(mockllm.PROPS, "modalities", {"vision": False, "audio": False})
+    real = mockllm.respond
+
+    def no_images(req, **kw):
+        if any(isinstance(m.get("content"), list) and any(p.get("type") == "image_url" for p in m["content"])
+               for m in req.get("messages", [])):
+            raise mockllm.MockHTTPError(500, {"error": {"code": 500, "message": "image input is not supported"}})
+        return real(req, **kw)
+
+    monkeypatch.setattr(mockllm, "respond", no_images)
+    rep = run_doctor(BASE_URL, tmp_path / "doctor" / "report.json", FIXTURE_DATA, "P0", transport=MockTransport())
+    vision = next(c for c in rep["checks"] if c["name"] == "vision")
+    assert rep["ok"] and vision.get("skipped") and not vision["required"]
+    assert rep["estimate"]["campaign_minutes"] > 0 and rep["recommendations"]["vision"] is False
 
 
 def test_cli_run_and_index(tmp_path, capsys):

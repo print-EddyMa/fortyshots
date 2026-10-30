@@ -71,6 +71,13 @@ class Doctor:
         self.checks: list[dict] = []
         self.reasoning_budget = DEFAULT_REASONING_BUDGET
         self.img_dir = Path("doctor/img")
+        self.has_vision = True  # set from /props modalities: a profile without mmproj cannot take images
+
+    def skip(self, name: str, why: str):
+        """Record a check that does not apply to this server (never required)."""
+        self.checks.append({"name": name, "ok": False, "required": False, "skipped": True, "detail": {"skipped": why},
+                            "dur_ms": 0})
+        print(f"  skip {name} ({why})", flush=True)
 
     def check(self, name: str, fn):
         required = name in REQUIRED
@@ -99,6 +106,9 @@ class Doctor:
         models = self.client.get("/v1/models").json()
         flags = props.get("default_generation_settings") or {}
         self.props = props
+        modalities = props.get("modalities")
+        if isinstance(modalities, dict) and "vision" in modalities:
+            self.has_vision = bool(modalities["vision"])
         return health.status_code == 200, {
             "model_path": props.get("model_path"), "build_info": props.get("build_info"),
             "n_ctx": flags.get("n_ctx"), "total_slots": props.get("total_slots"),
@@ -208,10 +218,11 @@ class Doctor:
             {"role": "tool", "tool_call_id": "c0002", "content": q.for_llm("c0002", "query_pool")},
             {"role": "user", "content": P.PROPOSER.format(round=1, rounds=4, n=10)}]
         rend = env.render_structure(id=q.ids[0], call_id="c0003")
+        critic_text = P.CRITIC.format(round=1, rounds=4, n=1, batch=f"{q.ids[0]} 0.2 | probe | c0002",
+                                      evidence=P.CRITIC_NO_PARITY.format(render=""))
         critic = [sysmsg, {"role": "user", "content": [
-            {"type": "text", "text": P.CRITIC.format(round=1, rounds=4, n=1, batch=f"{q.ids[0]} 0.2 | probe | c0002",
-                                                     evidence=P.CRITIC_NO_PARITY.format(render=""))},
-            image_part((img_dir.parent / rend.image).read_bytes())]}]
+            {"type": "text", "text": critic_text}, image_part((img_dir.parent / rend.image).read_bytes())]}
+            if self.has_vision else {"role": "user", "content": critic_text}]
         reporter = [sysmsg, {"role": "user", "content": P.REPORTER.format(evidence=q.for_llm("c0002", "query_pool"))}]
         return {
             "director": (director, {"tools": tool_schemas(env.tools), "tool_choice": "auto"}),
@@ -269,8 +280,12 @@ def run_doctor(base_url: str, out: Path, data_dir: Path, pool: str = "P0", hash_
     d.check("json_schema", d.json_schema)
     d.check("json_schema_with_tools", lambda: d.json_schema(with_tools=True))
     d.check("lab_batch_schema", d.lab_schema)
-    d.check("vision", d.vision)
-    d.check("vision_parity_reading", d.vision_parity)
+    if d.has_vision:
+        d.check("vision", d.vision)
+        d.check("vision_parity_reading", d.vision_parity)
+    else:
+        d.skip("vision", "the server has no vision encoder (profile without mmproj); campaigns run with --no-vision")
+        d.skip("vision_parity_reading", "no vision encoder")
     d.check("reasoning_budget", d.reasoning_budget_check)
     ok_thr, thr = d.check("throughput", d.throughput)
     model_path = (server or {}).get("model_path")
