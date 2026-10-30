@@ -12,3 +12,7 @@
 start A5-P0-s0-202610301238
 {"run_id": "A5-P0-s0-202610301238", "hits": 0, "spent": 40, "duration_s": 5105.1, "aborted": false}
 start A5-P0-s1-202610301403
+
+[lab] a campaign finished; pushing it: pushed: 15 new or changed item(s) to branch runs-mac (d6b475d)
+{"run_id": "A5-P0-s1-202610301403", "hits": 1, "spent": 40, "duration_s": 6001.6, "aborted": false}
+start A5-P0-s2-202610301544
