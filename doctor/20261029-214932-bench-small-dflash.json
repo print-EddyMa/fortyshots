@@ -1,0 +1,53 @@
+{
+  "kind": "bench",
+  "ts": "20261029-214932",
+  "profile": "small-dflash",
+  "started": true,
+  "quant": "UD-Q3_K_XL",
+  "draft": "dflash-Muse-Glimmer-30B-Q4_K_M.gguf",
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 24
+  },
+  "llama_build": 11960,
+  "load_s": 20,
+  "server_cmd": "llama-server -m /Users/eddyma/glimmer/Muse-Glimmer-30B-UD-Q3_K_XL.gguf --mmproj /Users/eddyma/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf -md /Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf -ngld 99 -c 32768 -a muse-glimmer-30b -ngl 99 -np 1 --jinja --temp 1.0 --top-p 0.95 --top-k 64 --reasoning-budget 1024 --cache-ram 1024 --ctx-checkpoints 8 --image-max-tokens 1024 --metrics --host 127.0.0.1 --port 8080 ",
+  "memory": {
+    "swap_growth_mb": 1853,
+    "free_pct_after": 8,
+    "wired_limit_mb": 20480
+  },
+  "log_excerpt": "0.00.274.365 I spec common_specu: auto-detected speculative type 'draft-dflash' from the draft model metadata | 0.01.033.543 E llama_init_from_model: failed to initialize the context: dflash requires ctx_other to be set (this warning is normal during memory fitting) | 0.01.081.061 W operator(): failed to measure the memory of the extra model, fitting without it: failed to create llama_context from model | 0.14.913.831 I common_speculative_init_result: loading draft model '/Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf' | 0.18.595.887 I srv    load_model: loaded multimodal model, '/Users/eddyma/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf' | 0.19.020.673 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false' | 0.19.021.322 I common_speculative_impl_draft_dflash: adding speculative implementation 'draft-dflash' | 0.19.021.326 I common_speculative_impl_draft_dflash: - n_max=3, n_min=0, p_min=0.00 | 0.19.021.327 I common_speculative_impl_draft_dflash: - block_size=16, mask_token_id=201818, n_extract=5, sample_from_anchor=true | 3.22.769.093 I slot print_timing: id  0  |  task 0  |  draft acceptance = 0.68290 (  603 accepted /   883 generated), mean len =  3.04 | 4.37.819.525 I slot print_timing: id  0  |  task 301  |  draft acceptance = 0.63052 (  314 accepted /   498 generated), mean len =  2.89 | ",
+  "bench": {
+    "cold": {
+      "seconds": 182.2,
+      "finish_reason": "length",
+      "cache_n": 0,
+      "draft_n": 883,
+      "draft_n_accepted": 603,
+      "predicted_ms": 131615.622,
+      "predicted_n": 900,
+      "predicted_per_second": 6.83,
+      "predicted_per_token_ms": 146.402,
+      "prompt_ms": 50514.906,
+      "prompt_n": 1685,
+      "prompt_per_second": 33.356,
+      "prompt_per_token_ms": 29.979
+    },
+    "warm": {
+      "seconds": 75.0,
+      "finish_reason": "stop",
+      "cache_n": 1654,
+      "draft_n": 498,
+      "draft_n_accepted": 314,
+      "predicted_ms": 73381.976,
+      "predicted_n": 480,
+      "predicted_per_second": 6.527,
+      "predicted_per_token_ms": 153.198,
+      "prompt_ms": 1610.821,
+      "prompt_n": 26,
+      "prompt_per_second": 16.141,
+      "prompt_per_token_ms": 61.955
+    }
+  }
+}

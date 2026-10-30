@@ -1,0 +1,49 @@
+{
+  "kind": "bench",
+  "ts": "20261029-214932",
+  "profile": "default",
+  "started": true,
+  "quant": "Q4_K_M",
+  "draft": "",
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 24
+  },
+  "llama_build": 11960,
+  "load_s": 22,
+  "server_cmd": "llama-server -m /Users/eddyma/glimmer/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf --mmproj /Users/eddyma/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf -c 32768 -a muse-glimmer-30b -ngl 99 -np 1 --jinja --temp 1.0 --top-p 0.95 --top-k 64 --reasoning-budget 1024 --cache-ram 1024 --ctx-checkpoints 8 --image-max-tokens 1024 --metrics --host 127.0.0.1 --port 8080 ",
+  "memory": {
+    "swap_growth_mb": 1372,
+    "free_pct_after": 7,
+    "wired_limit_mb": 20480
+  },
+  "log_excerpt": "0.21.468.973 I srv    load_model: loaded multimodal model, '/Users/eddyma/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf' | 0.21.930.027 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false' | ",
+  "bench": {
+    "cold": {
+      "seconds": 279.2,
+      "finish_reason": "length",
+      "cache_n": 0,
+      "predicted_ms": 231112.961,
+      "predicted_n": 900,
+      "predicted_per_second": 3.89,
+      "predicted_per_token_ms": 257.078,
+      "prompt_ms": 47997.612,
+      "prompt_n": 1685,
+      "prompt_per_second": 35.106,
+      "prompt_per_token_ms": 28.485
+    },
+    "warm": {
+      "seconds": 119.9,
+      "finish_reason": "stop",
+      "cache_n": 1654,
+      "predicted_ms": 116664.66,
+      "predicted_n": 454,
+      "predicted_per_second": 3.883,
+      "predicted_per_token_ms": 257.538,
+      "prompt_ms": 2939.219,
+      "prompt_n": 26,
+      "prompt_per_second": 8.846,
+      "prompt_per_token_ms": 113.047
+    }
+  }
+}

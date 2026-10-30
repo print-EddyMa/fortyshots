@@ -1,0 +1,29 @@
+
+==> Recording plan 'pilot': 3 campaigns (log: doctor/20261030-083850-record-pilot.log)
+         1. A5 on P0, seed 0
+         2. A5 on P0, seed 1
+         3. A5 on P0, seed 2
+        Finished campaigns are skipped and unfinished ones resume, so running this again is safe.
+        network: on
+  ok    Keeping the Mac awake (caffeinate -dims). Leave the lid open.
+  ok    Model already running: profile default, http://127.0.0.1:8080
+
+==> fortyshots record pilot (attempt 1 of 3)
+start A5-P0-s0-202610301238
+{"run_id": "A5-P0-s0-202610301238", "hits": 0, "spent": 40, "duration_s": 5105.1, "aborted": false}
+start A5-P0-s1-202610301403
+
+[lab] a campaign finished; pushing it: pushed: 15 new or changed item(s) to branch runs-mac (d6b475d)
+{"run_id": "A5-P0-s1-202610301403", "hits": 1, "spent": 40, "duration_s": 6001.6, "aborted": false}
+start A5-P0-s2-202610301544
+
+[lab] a campaign finished; pushing it: pushed: 16 new or changed item(s) to branch runs-mac (3a0c062)
+
+==> Plan 'pilot' summary
+        A5-P0-s0-202610301238              0/40 hits/lookups  85.1 min
+        A5-P0-s1-202610301403              1/40 hits/lookups  100.0 min
+        A5-P0-s2-202610301544              not finished
+        swap growth during the plan: 1.60 GB; network now: on
+  ok    Stopped model server (pid 90545)
+  warn  Stopped by Ctrl-C. Resume later with: ./lab record pilot
+pushed: 18 new or changed item(s) to branch runs-mac (7b64719)

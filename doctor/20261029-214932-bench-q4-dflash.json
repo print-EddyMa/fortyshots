@@ -1,0 +1,53 @@
+{
+  "kind": "bench",
+  "ts": "20261029-214932",
+  "profile": "q4-dflash",
+  "started": true,
+  "quant": "Q4_K_M",
+  "draft": "dflash-Muse-Glimmer-30B-Q4_K_M.gguf",
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 24
+  },
+  "llama_build": 11960,
+  "load_s": 8,
+  "server_cmd": "llama-server -m /Users/eddyma/glimmer/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf -md /Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf -ngld 99 -c 16384 -a muse-glimmer-30b -ngl 99 -np 1 --jinja --temp 1.0 --top-p 0.95 --top-k 64 --reasoning-budget 1024 --cache-ram 1024 --ctx-checkpoints 8 --image-max-tokens 1024 --metrics --host 127.0.0.1 --port 8080 ",
+  "memory": {
+    "swap_growth_mb": 1224,
+    "free_pct_after": 3,
+    "wired_limit_mb": 20480
+  },
+  "log_excerpt": "0.00.440.808 I spec common_specu: auto-detected speculative type 'draft-dflash' from the draft model metadata | 0.01.052.474 E llama_init_from_model: failed to initialize the context: dflash requires ctx_other to be set (this warning is normal during memory fitting) | 0.01.094.664 W operator(): failed to measure the memory of the extra model, fitting without it: failed to create llama_context from model | 0.03.831.622 I common_speculative_init_result: loading draft model '/Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf' | 0.05.727.238 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false' | 0.05.728.180 I common_speculative_impl_draft_dflash: adding speculative implementation 'draft-dflash' | 0.05.728.183 I common_speculative_impl_draft_dflash: - n_max=3, n_min=0, p_min=0.00 | 0.05.728.184 I common_speculative_impl_draft_dflash: - block_size=16, mask_token_id=201818, n_extract=5, sample_from_anchor=true | 3.06.704.947 I slot print_timing: id  0  |  task 0  |  draft acceptance = 0.73571 (  618 accepted /   840 generated), mean len =  3.21 | 4.16.679.734 I slot print_timing: id  0  |  task 286  |  draft acceptance = 0.66887 (  303 accepted /   453 generated), mean len =  3.01 | ",
+  "bench": {
+    "cold": {
+      "seconds": 178.3,
+      "finish_reason": "length",
+      "cache_n": 0,
+      "draft_n": 840,
+      "draft_n_accepted": 618,
+      "predicted_ms": 128221.855,
+      "predicted_n": 900,
+      "predicted_per_second": 7.011,
+      "predicted_per_token_ms": 142.627,
+      "prompt_ms": 50031.596,
+      "prompt_n": 1685,
+      "prompt_per_second": 33.679,
+      "prompt_per_token_ms": 29.692
+    },
+    "warm": {
+      "seconds": 69.9,
+      "finish_reason": "stop",
+      "cache_n": 1654,
+      "draft_n": 453,
+      "draft_n_accepted": 303,
+      "predicted_ms": 67272.927,
+      "predicted_n": 455,
+      "predicted_per_second": 6.749,
+      "predicted_per_token_ms": 148.178,
+      "prompt_ms": 2531.064,
+      "prompt_n": 26,
+      "prompt_per_second": 10.272,
+      "prompt_per_token_ms": 97.349
+    }
+  }
+}
