@@ -13,7 +13,9 @@ What fortyshots uses that it did not write, under which terms, and what we chang
   - Replaced CSD refcodes with salted SHA-256 IDs everywhere except `data/id_map.parquet`, which keeps the mapping public for reproducibility.
   - Stored one framework geometry and the best-DFT CO2 placement per MOF as JSON (`data/structures/`), with initial and DFT-relaxed adsorbate positions unwrapped by minimum image.
   - Computed new label-free descriptors (Zeo++ pore geometry, metal composition, a metal-cost tier) and MACE-MP-0 single-point energies on ODAC's initial placements (`data/descriptors.parquet`, `data/mace_cache.parquet`). These are our derived data, not part of ODAC23.
-- The derived files in `data/` are shared under the same CC-BY-4.0 terms, with attribution to the ODAC23 authors above.
+  - Mapped ODAC23's DDEC6 net atomic charges (`https://dl.fbaipublicfiles.com/dac/datasets/ddec.tar.gz`, same license) onto the framework atoms of each structure file by element and periodic position, rounded to 0.01 e, keyed by our IDs only (`results/ddec.json`, written by `python -m bench.chem ddec`; the 153 MB archive is never committed).
+  - Derived a pore grid for the landing structure (`results/hero.json`) and a 2-D t-SNE map of the pools (`results/atlas.json`) from the files above.
+- The derived files in `data/` and `results/` are shared under the same CC-BY-4.0 terms, with attribution to the ODAC23 authors above.
 
 ## Muse Glimmer 30B, Meta
 

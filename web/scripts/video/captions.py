@@ -158,6 +158,13 @@ def derived_values(draft: bool) -> tuple[dict, dict]:
         vals["VS_A2"] = verdict(t)
     if t := test("A5", "A3"):
         vals["VS_RF"] = verdict(t)
+    if (t2 := test("A5", "A2")) and (t3 := test("A5", "A3")) and arm("A2"):
+        verb = {"beats": "beats", "ties": "ties", "loses": "loses to"}
+        vals["WIN_TIE_LOSS_SENTENCE"] = (f"It {verb[verdict(t3)]} the random forest and {verb[verdict(t2)]} MACE-greedy "
+                                         f"({fmt_count(arm('A2').get('hits_mean'))}), the strongest baseline.")
+    cal = res.get("calibration") or {}
+    if cal.get("brier") is not None:
+        vals["BRIER"] = f"{cal['brier']:.3f}"
     leak = res.get("leak") or {}
     if leak.get("L_auc") is not None:
         vals["LEAK_SENTENCE"] = f"a refcode-ranking AUC of {leak['L_auc']:.2f}"
@@ -184,11 +191,20 @@ def derived_values(draft: bool) -> tuple[dict, dict]:
     if site.get("REPO_URL"):
         vals["REPO_URL"] = site["REPO_URL"]
 
+    # bench.fill_docs --write records every value it filled; its wording wins over the simple rules above
+    for k, v in ((load_json(ROOT / "results" / "doc_values.json") or {}).get("values") or {}).items():
+        val = v.get("value") if isinstance(v, dict) else v
+        if val not in (None, ""):
+            vals[k] = str(val)
+
     if draft:
         run, ev = showcase_run()
         if run:
             if "H" not in vals and run.get("hits") is not None:
                 prov["H"] = str(run["hits"])
+            sm = next((e for e in ev if e.get("kind") == "summary"), None)
+            if sm and "BRIER" not in vals and sm["payload"].get("brier") is not None:
+                prov["BRIER"] = f"{sm['payload']['brier']:.3f}"
             cc = next((e for e in ev if e.get("kind") == "claimcheck"), None)
             if cc and "CLAIMS_N" not in vals:
                 p = cc["payload"]
@@ -434,7 +450,7 @@ def main() -> int:
     ap.add_argument("--voice", default=None, help="voice track (m4a/wav); omit for estimated timing")
     ap.add_argument("--values", default=None, help="JSON {KEY: value} for placeholders (default media/values.json if present)")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
-    ap.add_argument("--variant", default="auto", choices=["auto", "A", "B"], help="narration variant at 1:15")
+    ap.add_argument("--variant", default="auto", choices=["auto", "A", "B"], help="narration variant at 1:40")
     ap.add_argument("--draft", action="store_true", help="fill missing numbers from the showcase run (provisional)")
     ap.add_argument("--max-seconds", type=float, default=180.0, help="hard cap for the main video")
     ap.add_argument("--noise-db", type=float, default=None, help="silencedetect threshold (default: 18 dB under the mean)")
@@ -461,7 +477,8 @@ def main() -> int:
 
     variant = a.variant
     if variant == "auto":
-        variant = "A" if values.get("WHAT_IT_USED") else "B" if values.get("N_CHANGED") and values.get("A5_N") else "A"
+        # A needs WHAT_IT_USED (the showcase run changed course after its calibration); B has no placeholder
+        variant = "A" if values.get("WHAT_IT_USED") else "B"
     fill = Filler(values)
 
     # ---------------------------------------------------------------- storyboard

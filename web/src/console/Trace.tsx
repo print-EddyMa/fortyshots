@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { LlmStep, NoteItem, RunState, ToolLine, TraceItem } from '../lib/replay';
-import { hhmmss, num, ROLE_LABEL } from '../lib/format';
+import { hhmmss, mutationText, num, ROLE_LABEL } from '../lib/format';
 import { runAsset } from '../lib/data';
 
 function argSummary(t: ToolLine): string {
@@ -273,13 +273,17 @@ function Note({ n, runId, onCite }: { n: NoteItem; runId: string; onCite: (c: st
         </>
       );
     case 'mutation':
+      // proposals come from the Chemist (ledger); built/invalid results from the container (mutations.jsonl sidecar)
       return (
         <>
-          {head('Chemist', 'mutation')}
+          {head(p.status === 'proposed' ? 'Chemist' : 'Prospective build', p.status === 'proposed' ? 'mutation' : 'container · MACE')}
           <p className="t-body mono">
-            {p.parent} → {typeof p.spec === 'string' ? p.spec : JSON.stringify(p.spec)} · {p.status}
+            {p.parent} → {typeof p.spec === 'string' ? p.spec : mutationText(p.spec)} ·{' '}
+            <span className={p.status === 'invalid' ? 'fail' : p.status === 'built' ? 'pass-text' : 'faint'}>{p.status}</span>
+            {p.mutant_id ? ` · ${p.mutant_id}` : ''}
           </p>
-          <p className="small">unvalidated · ML only</p>
+          {p.note && <p className="small muted">{p.note}</p>}
+          <p className="small faint">unvalidated · ML only</p>
         </>
       );
     case 'message':

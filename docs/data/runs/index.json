@@ -95,5 +95,18 @@
   "duration_s": 100,
   "started": "2026-10-29T19:44:25Z",
   "model": "muse-glimmer-30b"
+ },
+ {
+  "run_id": "mock-A5-P0-s90-202610301258",
+  "arm": "A5",
+  "pool": "P0",
+  "seed": 90,
+  "mode": "mock",
+  "hits": 1,
+  "spent": 40,
+  "duration_s": 1.5,
+  "started": "2026-10-30T12:58:27.965Z",
+  "model": "muse-glimmer-30b-mock",
+  "goal": "Prospective mode demo (mock): the Chemist's mutants, built and ranked in the container"
  }
 ]

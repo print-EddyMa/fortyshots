@@ -2,9 +2,12 @@
 //
 //   node scripts/copy-data.mjs            -> ../docs/data   (after vite build)
 //   node scripts/copy-data.mjs --public   -> public/data    (for `vite` dev server)
+//   node scripts/copy-data.mjs --out DIR  -> DIR/data       (after vite build --outDir DIR)
 //
 // Sources: real repo-root runs/ and results/ when present, else web/fixtures/ (mock).
-// cassette.jsonl files are never copied.
+// FORTYSHOTS_RUNS_DIR=<dir> replaces repo-root runs/ (demo builds and screenshots from a scratch runs dir).
+// cassette.jsonl files are never copied. Prospective mode output is: runs/<id>/mutants/ (index.json and one
+// viewer file per mutant with its relaxation frames) and the runs/<id>/mutations.jsonl sidecar.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +15,8 @@ import { fileURLToPath } from 'node:url';
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT = resolve(WEB, '..');
 const toPublic = process.argv.includes('--public');
-const SITE = toPublic ? join(WEB, 'public') : join(ROOT, 'docs');
+const outIdx = process.argv.indexOf('--out'); // --out <dir>: a scratch build (e.g. vite build --outDir <dir>)
+const SITE = outIdx > 0 ? resolve(process.argv[outIdx + 1]) : toPublic ? join(WEB, 'public') : join(ROOT, 'docs');
 const OUT = join(SITE, 'data');
 const STRUCT_LIMIT = 25 * 1024 * 1024;
 
@@ -59,17 +63,25 @@ mkdirSync(OUT, { recursive: true });
 const manifest = { built: new Date().toISOString(), sources: {} };
 
 // ---- runs
-const realRuns = join(ROOT, 'runs');
+const realRuns = process.env.FORTYSHOTS_RUNS_DIR ? resolve(process.env.FORTYSHOTS_RUNS_DIR) : join(ROOT, 'runs');
 const useReal = runDirs(realRuns).length > 0;
 const runsSrc = useReal ? realRuns : join(WEB, 'fixtures', 'runs');
-manifest.sources.runs = useReal ? 'runs/' : 'web/fixtures/runs (mock)';
+manifest.sources.runs = useReal ? (process.env.FORTYSHOTS_RUNS_DIR ? `${realRuns} (FORTYSHOTS_RUNS_DIR)` : 'runs/') : 'web/fixtures/runs (mock)';
 mkdirSync(join(OUT, 'runs'), { recursive: true });
 const ids = runDirs(runsSrc);
+let nMutants = 0;
 for (const id of ids) {
   cpSync(join(runsSrc, id), join(OUT, 'runs', id), {
     recursive: true,
-    filter: (src) => !src.endsWith('cassette.jsonl'),
+    filter: (src) => !src.endsWith('cassette.jsonl') && !src.endsWith('.tmp'),
   });
+  // prospective mode: mutants/ (index + viewer files with frames) and the mutations.jsonl sidecar
+  const mdir = join(runsSrc, id, 'mutants');
+  if (existsSync(join(mdir, 'index.json'))) {
+    mkdirSync(join(OUT, 'runs', id, 'mutants'), { recursive: true });
+    for (const f of readdirSync(mdir)) if (f.endsWith('.json')) copyFileSync(join(mdir, f), join(OUT, 'runs', id, 'mutants', f));
+    nMutants += JSON.parse(readFileSync(join(mdir, 'index.json'), 'utf8')).mutants?.length ?? 0;
+  }
 }
 let index = [];
 if (existsSync(join(runsSrc, 'index.json'))) index = JSON.parse(readFileSync(join(runsSrc, 'index.json'), 'utf8'));
@@ -77,7 +89,7 @@ const known = new Set(index.map((r) => r.run_id));
 for (const id of ids) if (!known.has(id)) index.push(indexEntry(runsSrc, id));
 index = index.filter((r) => ids.includes(r.run_id));
 writeFileSync(join(OUT, 'runs', 'index.json'), JSON.stringify(index, null, 1));
-log(`runs: ${ids.length} from ${manifest.sources.runs}`);
+log(`runs: ${ids.length} from ${manifest.sources.runs}; prospective mutants: ${nMutants}`);
 
 // ---- results
 mkdirSync(join(OUT, 'results'), { recursive: true });

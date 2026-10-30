@@ -1,5 +1,5 @@
 import { DATA, LIVE } from './config';
-import type { IndexEntry, Pools, Results, RunEvent, Structure } from './types';
+import type { IndexEntry, MutantDoc, MutantIndex, Pools, Results, RunEvent, Structure } from './types';
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -46,6 +46,21 @@ export async function loadEvents(runId: string): Promise<RunEvent[]> {
 
 /** URL of a file inside a run directory (images the agent saw). The live server mounts runs/ at /data/runs. */
 export const runAsset = (runId: string, path: string) => `${DATA}/runs/${encodeURIComponent(runId)}/${path}`;
+
+/** Prospective mutants of a run (physics/prospective.py, runs/<id>/mutants/index.json); null when it has none. */
+export const loadMutants = (runId: string) => get<MutantIndex>(runAsset(runId, 'mutants/index.json')).catch(() => null);
+
+/** One mutant in viewer format plus its MACE relaxation frames. */
+export const loadMutantDoc = (url: string) => get<MutantDoc>(url);
+
+/** Sidecar `mutation` events (runs/<id>/mutations.jsonl): built/invalid results, never part of the ledger. */
+export async function loadSidecar(runId: string): Promise<RunEvent[]> {
+  try {
+    return parseJsonl(await get<string>(runAsset(runId, 'mutations.jsonl'), 'text'));
+  } catch {
+    return [];
+  }
+}
 
 /** Tail a run over SSE. Each message's data is one ledger line. Returns an unsubscribe function. */
 export function subscribeLive(

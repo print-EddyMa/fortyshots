@@ -1038,3 +1038,103 @@ table.data.cand-table th {
 .q-status {
   text-align: right;
 }
+
+/* ---------- prospective mutants (queue) */
+.mutants {
+  margin-top: 8px;
+}
+
+.m-note {
+  margin: 0 0 8px;
+}
+
+.m-main {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.m-rank {
+  flex: none;
+  min-width: 22px;
+}
+
+.m-item {
+  cursor: pointer;
+}
+
+.m-item:hover {
+  background: var(--fill-hover);
+}
+
+.m-spec {
+  margin-bottom: 2px;
+}
+
+.m-why {
+  margin-top: 0;
+}
+
+.m-checks,
+.m-grey {
+  margin: 2px 0 0;
+  line-height: 18px;
+}
+
+/* greyed: ML binding energies are shown for transparency only, never as a ranking signal */
+.m-grey {
+  color: var(--fg-faint);
+  opacity: 0.75;
+}
+
+.m-act {
+  margin-top: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.m-reason {
+  flex: 1 1 140px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--mono);
+}
+
+.m-reason::placeholder {
+  color: var(--fg-faint);
+}
+
+.m-reason:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.m-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.m-decided {
+  margin: 0;
+}
+
+.m-decided .dot {
+  margin-right: 4px;
+}
+
+.m-view {
+  margin: 6px 0 0;
+}
+
+.m-mace-note {
+  margin: 8px 0 12px;
+}
+
+.q-item.rej.m-item .m-spec {
+  text-decoration: line-through;
+  text-decoration-color: var(--fail);
+}

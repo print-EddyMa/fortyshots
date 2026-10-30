@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { CommandPill, Page, Prelim } from '../components/Chrome';
 import { DiscoveryChart, type CurveSeries } from '../components/Charts';
 import { Console } from '../console/Console';
+import { HeroMof } from '../components/HeroMof';
+import { AtlasPlayer, type AtlasSeq } from '../components/Atlas';
+import { loadAtlas, type AtlasData } from '../lib/chemData';
+import { derive } from '../lib/replay';
 import { REPO_URL, PREREG_URL } from '../lib/config';
 import { hasMockRuns, isPreliminary, loadEvents, pickShowcase } from '../lib/data';
 import { ci, count, num, shortSha } from '../lib/format';
@@ -90,6 +94,44 @@ function Hero({ showcase, results }: { showcase: IndexEntry; results: Results | 
   );
 }
 
+/** Where the agent looked: its 40 purchases on the map of chemical space, against seed-0 baselines on the same pool. */
+function AtlasSection({ showcase }: { showcase: IndexEntry }) {
+  const [atlas, setAtlas] = useState<AtlasData | null>(null);
+  const [agent, setAgent] = useState<string[] | null>(null);
+  useEffect(() => {
+    loadAtlas().then(setAtlas, () => setAtlas(null));
+    loadEvents(showcase.run_id).then(
+      (ev) => {
+        const st = derive(ev);
+        setAgent(st.cands.filter((c) => c.order != null).sort((a, b) => a.order! - b.order!).map((c) => c.id));
+      },
+      () => setAgent([]),
+    );
+  }, [showcase.run_id]);
+  if (!atlas || !agent) return null;
+  const pool = showcase.pool;
+  const paths = atlas.paths.by_pool[pool] ?? {};
+  const mock = showcase.mode === 'mock' || showcase.run_id.startsWith('mock-');
+  const seqs: AtlasSeq[] = [];
+  if (agent.length) seqs.push({ key: 'agent', label: 'Agent', ids: agent, note: `${showcase.run_id}${mock ? ' · mock run' : ''}` });
+  if (paths.A0) seqs.push({ key: 'A0', label: 'Random', ids: paths.A0, note: `Random baseline, seed ${atlas.paths.seed}, results/baselines.parquet` });
+  if (paths.A2) seqs.push({ key: 'A2', label: 'MACE-greedy', ids: paths.A2, note: `Lowest cheap MACE score first, seed ${atlas.paths.seed}` });
+  if (paths.A3) seqs.push({ key: 'A3', label: 'RF-UCB', ids: paths.A3, note: `Random-forest UCB on bought labels, seed ${atlas.paths.seed}` });
+  return (
+    <section className="wrap section" id="atlas">
+      <div className="section-head">
+        <h2 className="label">Where it looked</h2>
+        <span className="small mono">{atlas.n.toLocaleString()} MOFs · t-SNE · no DFT labels as input</span>
+      </div>
+      <p className="section-lede">
+        Every MOF in the six pools, placed by its pore geometry, density, metal and cheap MACE energies. Nearby points are similar
+        materials. The path is one campaign's 40 DFT purchases in {pool}, ten per round.
+      </p>
+      <AtlasPlayer atlas={atlas} pool={pool} seqs={seqs} />
+    </section>
+  );
+}
+
 export function Landing() {
   const results = useResults();
   const index = useIndex();
@@ -151,7 +193,18 @@ export function Landing() {
         )}
       </section>
 
-      <section className="wrap">{showcase && <Hero showcase={showcase} results={R} />}</section>
+      <section className="wrap">
+        <HeroMof />
+      </section>
+
+      {showcase && <AtlasSection showcase={showcase} />}
+
+      <section className="wrap section">
+        <div className="section-head">
+          <h2 className="label">Inside a run</h2>
+        </div>
+        {showcase && <Hero showcase={showcase} results={R} />}
+      </section>
 
       <section className="wrap section">
         <div className="section-head">

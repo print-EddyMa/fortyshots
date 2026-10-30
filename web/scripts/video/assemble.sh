@@ -8,7 +8,7 @@
 #
 # Inputs (defaults in brackets):
 #   --voice FILE        narration [media/voice.m4a if present]; without it: estimated timing, silent track
-#   --live FILE         Mac screen recording for 0:22-0:38 [media/live.mov or live.mp4]; without it: the
+#   --live FILE         Mac screen recording for 0:24-0:42 [media/live.mov or live.mp4]; without it: the
 #                       console's Model tab from the B-roll stands in
 #   --live-cuts LIST    seconds of live.mov to use, "in-out,in-out" [0-row length]; if they add up to more than
 #                       the row, they are sped up and get an "N× speed" label
@@ -183,7 +183,7 @@ if [ "$DO_X" = 1 ]; then
   check "$XOUT" 1080x1920 40.5
 fi
 [ -z "$VOICE" ] && [ "$DO_MAIN" = 1 ] && say "note: no voice track; the audio is silent and caption timing is estimated"
-[ -z "$LIVE" ] && [ "$DO_MAIN" = 1 ] && say "note: no live.mov; 0:22-0:38 shows the console's Model tab instead"
+[ -z "$LIVE" ] && [ "$DO_MAIN" = 1 ] && say "note: no live.mov; 0:24-0:42 shows the console's Model tab instead"
 "$PY" - "$TIMELINE" <<'EOF'
 import json, sys
 t = json.load(open(sys.argv[1]))

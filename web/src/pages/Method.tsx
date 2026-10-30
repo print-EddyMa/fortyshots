@@ -169,6 +169,29 @@ export function MethodPage() {
           header in its Model tab.
         </p>
 
+        <h2 id="visuals">Where the pictures come from</h2>
+        <ul>
+          <li>
+            <span className="muted">Landing structure.</span> The test-pool hit with the largest cavity whose CO2 moves at least 0.5 Å in the
+            DFT relaxation, chosen by rule in <code>bench/chem.py</code>. Atoms move from the ODAC initial placement to the DFT-relaxed
+            geometry in its structure file. The mesh is the surface where a 1.65 Å probe (half CO2's kinetic diameter) touches the
+            framework's van der Waals surface, from a grid computed on the relaxed framework.
+          </li>
+          <li>
+            <span className="muted">Atlas.</span> A t-SNE (scikit-learn, fixed seed) of the 3,000 pool MOFs from the descriptors and MACE
+            values the agent can see; DFT labels are not inputs (<code>bench/atlas.py</code>). Baseline paths are seed 0 of each arm in{' '}
+            <code>results/baselines.parquet</code>; the agent path is the purchase order in the run ledger.
+          </li>
+          <li>
+            <span className="muted">Binding site.</span> Distances from each CO2 atom to its nearest framework atom and to the nearest metal,
+            minimum image across the periodic cell, at the DFT-relaxed geometry.
+          </li>
+          <li>
+            <span className="muted">Charges.</span> ODAC23 DDEC6 net atomic charges (Meta FAIR, CC-BY-4.0), matched to each structure's atoms
+            by element and position (<code>bench/chem.py ddec</code>).
+          </li>
+        </ul>
+
         <h2 id="reproduce">Reproduce</h2>
         <pre tabIndex={0}>
           <code>{`git clone ${repoPath}

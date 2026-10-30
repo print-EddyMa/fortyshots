@@ -18,7 +18,7 @@
 // same script works when real runs replace the fixtures.
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '../pw.mjs';
@@ -167,8 +167,109 @@ html,body{margin:0;padding:0;width:${f.out[0]}px;height:${f.out[1]}px;overflow:h
 iframe{display:block;border:0;width:${f.vw}px;height:${f.vh}px;background:#0d0d0d}
 </style></head><body><div id="cam"><iframe id="site" title="site"></iframe></div></body></html>`;
 
+// ------------------------------------------------------------------------------------------- cards
+// Two HTML cards recorded like any other shot, styled like the site (Geist from the built bundle, hairlines).
+// "built": what was made during the event and what was used, with the commit count from git.
+// "close": the clone command typed into a terminal line, then the repo and site URLs.
+const siteCfg = JSON.parse(readFileSync(join(ROOT, 'web', 'site.config.json'), 'utf8'));
+const short = (u) => String(u ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+function gitCount() {
+  try {
+    return execFileSync('git', ['-C', ROOT, 'rev-list', '--count', 'hackathon-start..HEAD']).toString().trim();
+  } catch {
+    return null;
+  }
+}
+const COMMITS = gitCount();
+function fontFaces() {
+  const dir = join(DOCS, 'assets');
+  let files = [];
+  try {
+    files = readdirSync(dir);
+  } catch {
+    /* no build */
+  }
+  const sans = files.find((f) => /^geist-latin-wght-normal-.*\.woff2$/.test(f));
+  const mono = files.find((f) => /^geist-mono-latin-wght-normal-.*\.woff2$/.test(f));
+  return [
+    sans && `@font-face{font-family:Geist;src:url(/assets/${sans}) format('woff2');font-weight:100 900}`,
+    mono && `@font-face{font-family:'Geist Mono';src:url(/assets/${mono}) format('woff2');font-weight:100 900}`,
+  ]
+    .filter(Boolean)
+    .join('');
+}
+const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function cardHtml(kind) {
+  const base = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>${fontFaces()}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font-family:Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px;line-height:24px}
+.mono{font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums slashed-zero;font-feature-settings:'zero' 1}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.in{opacity:0;animation:up .42s cubic-bezier(.16,1,.3,1) forwards}
+</style>`;
+  if (kind === 'built') {
+    const built = [
+      ['The four-role agent', 'Director, Proposer, Critic, Reporter · 7 tools'],
+      ['The lab runtime', 'one command on a 24 GB MacBook · live approval'],
+      ['The benchmark', 'pre-registered · blind DFT scoring · verifier'],
+      ['This site and console', 'replay of every ledger · chemistry views'],
+      ['The materials proposer', 'mutant frameworks · MACE relaxation'],
+    ];
+    const used = [
+      ['Muse Glimmer 30B + DFlash drafter', 'Meta · open weights'],
+      ['ODAC23 DFT data + EquiformerV2', 'Meta FAIR'],
+      ['MACE-MP-0', 'cheap physics'],
+      ['llama.cpp', 'local inference'],
+    ];
+    const rows = (xs, d0) =>
+      xs.map(([a, b], i) => `<div class="row in" style="animation-delay:${d0 + i * 0.16}s"><span>${esc(a)}</span><span class="d">${esc(b)}</span></div>`).join('');
+    return `${base}<style>
+body{background:#fafafa;color:#0a0a0a;display:flex;align-items:center;justify-content:center}
+.wrap{width:min(1080px,100% - 48px)}
+h1{font-size:clamp(34px,4.4vw,60px);line-height:1;letter-spacing:-.045em;font-weight:500;margin:0 0 36px}
+h1 span{color:#8c8c8c}
+.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:48px}
+.lab{font-size:13px;color:#666;padding-bottom:10px;border-bottom:1px solid #d4d4d4}
+.row{display:flex;flex-direction:column;padding:11px 0;border-bottom:1px solid #e5e5e5}
+.row .d{color:#737373;font-size:13px;line-height:20px}
+.foot{margin-top:32px;font-size:13px;color:#666;display:flex;gap:10px;align-items:baseline}
+.foot b{font-weight:400;color:#0a0a0a;font-size:22px}
+@media (max-width:640px){.cols{grid-template-columns:1fr;gap:28px}h1{margin-bottom:24px}.row{padding:8px 0}}
+</style></head><body><div class="wrap">
+<h1 class="in">Built this week. <span>Oct 27 – Nov 4, 2026.</span></h1>
+<div class="cols"><div><div class="lab in" style="animation-delay:.2s">Built during the hackathon</div>${rows(built, 0.35)}</div>
+<div><div class="lab in" style="animation-delay:.25s">Used</div>${rows(used, 1.2)}</div></div>
+<div class="foot mono in" style="animation-delay:2s"><b>${esc(COMMITS ?? '—')}</b> commits since hackathon-start <span style="color:#737373">· git rev-list --count hackathon-start..HEAD</span></div>
+</div></body></html>`;
+  }
+  const cmd = `git clone ${short(siteCfg.REPO_URL)} && ./lab verify`;
+  return `${base}<style>
+body{background:#0d0d0d;color:#ededed;display:flex;align-items:center;justify-content:center}
+.wrap{width:min(1080px,100% - 48px)}
+.term{font-size:clamp(15px,1.9vw,26px);line-height:1.5;letter-spacing:-.02em;padding:22px 26px;border:1px solid #333;border-radius:12px;background:#141414;overflow-wrap:anywhere}
+.term .p{color:#858585}
+.cur{display:inline-block;width:.6em;height:1.1em;vertical-align:-.15em;background:#f59e4b;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.urls{margin-top:28px;display:grid;gap:6px;font-size:clamp(14px,1.5vw,20px);color:#8b8b8b}
+.urls b{color:#ededed;font-weight:400}
+h2{font-size:clamp(28px,3.4vw,46px);line-height:1.05;letter-spacing:-.04em;font-weight:500;margin:0 0 28px}
+h2 span{color:#858585}
+</style></head><body><div class="wrap">
+<h2 class="in">Open. <span>Clone it and check every number.</span></h2>
+<div class="term mono in" style="animation-delay:.3s"><span class="p">$ </span><span id="t"></span><span class="cur"></span></div>
+<div class="urls mono"><div class="in" id="u1" style="animation-play-state:paused">code <b>${esc(short(siteCfg.REPO_URL))}</b></div><div class="in" id="u2" style="animation-play-state:paused">site <b>${esc(short(siteCfg.SITE_URL))}</b></div></div>
+</div><script>
+const cmd=${JSON.stringify(cmd)};let i=0;const t=document.getElementById('t');
+setTimeout(function k(){t.textContent=cmd.slice(0,++i);if(i<cmd.length)setTimeout(k,38+Math.random()*30);else{['u1','u2'].forEach((id,j)=>{const e=document.getElementById(id);e.style.animationDelay=(0.3+j*0.25)+'s';e.style.animationPlayState='running';});}},900);
+</script></body></html>`;
+}
+
 const server = createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/__card.html') {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' });
+    return res.end(cardHtml(u.searchParams.get('k')));
+  }
   if (u.pathname === '/__broll.html') {
     const base = FORMATS[u.searchParams.get('f')] ?? FORMATS.desktop;
     const vw = Number(u.searchParams.get('vw')) || base.vw;
@@ -429,6 +530,149 @@ const hasEvent = (i) => i >= 0;
 const SEC = 1000;
 
 const SHOTS = [
+  {
+    id: 'hero-orbit',
+    storyboard: '0:00–0:10 (Hook)',
+    xclip: '0–4 s',
+    speed: 1,
+    zoom: 1.6,
+    desc: 'Landing hero: a real DFT hit as a 2x2x2 supercell inside its pore mesh, orbiting; CO2 moves from the ODAC initial placement to the DFT-relaxed pose.',
+    async record(s) {
+      await s.go('#/');
+      // the 3D view loads when it nears the viewport, so scroll first
+      await s.scroll('.specimen', 0, s.mobile ? 120 : 40);
+      await s.frame.waitForSelector('.specimen-host[data-ready="1"]', { timeout: 60000 });
+      // the burned-in subtitles sit at the bottom of the frame: move the specimen caption to the top for this shot
+      await s.frame.addStyleTag({ content: '.specimen-cap{bottom:auto;top:44px}.specimen-legend{flex-basis:auto}' });
+      if (!s.mobile) await s.cam(['.specimen-frame'], 0, -4);
+      await s.hold(1500);
+      s.start();
+      await s.tap(s.frame.locator('.specimen-ctl button', { hasText: 'replay' }));
+      s.mark('relax');
+      await s.hold(15000);
+    },
+  },
+  {
+    id: 'why-hard',
+    storyboard: '0:10–0:24 (The problem)',
+    xclip: '4–10 s',
+    speed: 1,
+    vw: 1120,
+    zoom: 1.5,
+    desc: 'Results page: DFT CO2 vs water binding for the 3,000 MOFs of the six pools, hits filled, with the share where water wins.',
+    async record(s) {
+      await s.go('#/results');
+      await s.frame.waitForSelector('.stats');
+      const sec = await s.tag('Why this is hard', 'whyhard', 1);
+      await s.scroll(sec, 0, s.mobile ? 80 : 100);
+      if (!s.mobile) await s.cam([sec], 0, 20);
+      await s.hold(1200);
+      s.start();
+      await s.hold(14000);
+    },
+  },
+  {
+    id: 'atlas-path',
+    storyboard: '0:10–0:24 (map) and 0:52–1:40 (path)',
+    xclip: '22–30 s',
+    speed: 1,
+    zoom: 1.5,
+    desc: "Atlas of 3,000 MOFs (t-SNE of label-free descriptors + MACE); the showcase run's 40 purchases grow round by round, hits flash.",
+    async record(s) {
+      await s.go('#/?atlas=paused');
+      await s.frame.waitForSelector('#atlas canvas', { timeout: 30000 });
+      await s.scroll('#atlas', 0, s.mobile ? 60 : 70);
+      if (!s.mobile) await s.cam(['#atlas .atlas'], 0, 18);
+      await s.hold(1200);
+      s.start();
+      s.mark('overview');
+      await s.hold(5000);
+      await s.tap(s.frame.locator('.atlas-replay'));
+      s.mark('play');
+      await s.hold(12000);
+      s.mark('done');
+      await s.hold(2500);
+    },
+  },
+  {
+    id: 'periodic-table',
+    storyboard: 'spare (Results: which metals)',
+    xclip: null,
+    speed: 1,
+    vw: 1120,
+    zoom: 1.4,
+    desc: 'Results page: the periodic table of DFT hit rates by metal; focus moves across copper, zinc, lithium and uranium.',
+    async record(s) {
+      await s.go('#/results');
+      await s.frame.waitForSelector('.ptable');
+      await s.scroll('#metals', 0, s.mobile ? 60 : 80);
+      if (!s.mobile) await s.cam(['#metals'], 0, 16);
+      await s.hold(1200);
+      s.start();
+      await s.hold(1800);
+      for (const name of ['copper', 'zinc', 'lithium', 'uranium']) {
+        await s.frame.locator(`.pt-cell[aria-label^="${name}"]`).focus().catch(() => undefined);
+        s.mark(name);
+        await s.hold(2300);
+      }
+    },
+  },
+  {
+    id: 'binding-site',
+    storyboard: '0:52–1:40 (the reveal close-up)',
+    xclip: '10–22 s',
+    speed: 1,
+    zoom: 2.4,
+    skipIf: () => !hasEvent(M.bestReveal) && 'run has no dft_result',
+    desc: 'Console viewer after a reveal: binding-site close-up with dashed contacts and distances from the DFT-relaxed geometry, then DDEC6 charges.',
+    async record(s) {
+      await s.go(consoleHash(`paused=1&speed=1&seq=${EVENTS[M.bestReveal].seq}`));
+      await s.consoleReady();
+      await s.frame.waitForSelector('.viewer-host[data-status="ready"]', { timeout: 30000 });
+      if (s.mobile) await s.scroll('.viewer', 0, 60);
+      else await s.cam(['.viewer'], 0, 8);
+      await s.hold(1500);
+      s.start();
+      await s.hold(800);
+      const site = s.frame.getByRole('button', { name: 'site', exact: true });
+      if (await site.count()) {
+        await s.tap(site);
+        await s.hold(300);
+        await s.tap(site);
+      }
+      s.mark('site');
+      await s.hold(6000);
+      await s.tap(s.frame.getByRole('button', { name: 'charge', exact: true })).catch(() => undefined);
+      s.mark('charge');
+      await s.hold(5500);
+    },
+  },
+  {
+    id: 'built-card',
+    storyboard: '0:42–0:52 (Built this week)',
+    xclip: null,
+    speed: 1,
+    desc: 'Card: what was built during the hackathon and what was used, with the commit count since hackathon-start from git.',
+    async record(s) {
+      await s.frame.goto(`${BASE}__card.html?k=built`, { waitUntil: 'networkidle' });
+      await s.frame.evaluate(() => document.fonts.ready);
+      s.start();
+      await s.hold(11000);
+    },
+  },
+  {
+    id: 'close-card',
+    storyboard: '2:50–3:00 (Close)',
+    xclip: null,
+    speed: 1,
+    desc: 'Card: the clone-and-verify command typed into a terminal line, then the repo and site URLs.',
+    async record(s) {
+      await s.frame.goto(`${BASE}__card.html?k=close`, { waitUntil: 'networkidle' });
+      await s.frame.evaluate(() => document.fonts.ready);
+      s.start();
+      await s.hold(11000);
+    },
+  },
   {
     id: 'landing-headline',
     storyboard: '0:00–0:22 (after the title card) and 2:47–3:00',

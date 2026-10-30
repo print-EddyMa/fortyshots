@@ -1,56 +1,55 @@
 # Demo video: storyboard, narration and recording checklist
 
-Length: 3:00 or less. The judges score the video first, so it carries the project.
+Length: 3:00 or less (about 390 words of narration, roughly 2:45 spoken). The judges score the video first, so it carries the project. It tells one story: a real material, the problem, the open model on a laptop, what was built this week, the agent at work, the honest result, and where it goes next.
 
 ## Rules for every line
 
-- Numbers come from `results/results.json` only. Fill each `{{...}}` before recording the narration.
+- Numbers come from `results/results.json` only. Fill each `{{...}}` before recording the narration (`python -m bench.fill_docs --write`).
 - Say "picked {{H}} of the hidden hits", never "found new sorbents" or "discovered". The candidates are known MOFs and the labels already existed.
-- Name both baselines whenever the agent's number is said: random and the random forest.
+- Name both baselines whenever the agent's number is said: random and the strongest baseline (`{{WIN_TIE_LOSS_SENTENCE}}` also names the random forest).
 - Say "Wi-Fi off" only about a run whose header says `network: off` (visible in the console's Model tab). The benchmark nights may have had Wi-Fi on; their headers say so.
-- Show what the selected run actually shows. The featured run is fixed by rule (PREREG §9: the A5 run on P1 with the median hits@40). If it did not change strategy after checking the simulator, use the second narration variant at 1:15.
-- Any sped-up segment carries a visible speed label (for example "8x").
+- Show what the selected run actually shows. The featured run is fixed by rule (PREREG §9: the A5 run on P1 with the median hits@40). If it did not change strategy after checking the simulator, read variant B at 1:40.
+- Any sped-up segment carries a visible speed label (for example "8× speed").
+- The hackathon rules require that judges can tell what was built during the event: the 0:42 card and the closing lower third say it, with the commit count from git.
 - No code editor on screen. No notifications, personal tabs or bookmarks.
 
 ## Storyboard and narration
 
 | Time | Picture | Narration (your voice) |
 |---|---|---|
-| 0:00–0:08 | Black frame, two-tone mono text: "40 DFT lookups. {{H}} of the hidden hits." / "Random: {{RANDOM_HITS}}. Best baseline: {{A2_HITS}}." | "One open Meta model on my laptop, no API key. Forty lookups, {{H}} hidden CO2 binders. The best simple baseline finds {{A2_HITS}}." |
-| 0:08–0:22 | Results page: CO2 vs water binding scatter of the pool, the 85 hits out of 3,026 highlighted | "Sorbents for direct air capture fail because water takes the binding site. Checking each candidate with DFT is expensive, so the real question is which forty to check." |
-| 0:22–0:38 | Mac: Wi-Fi turned off in the menu bar; Terminal `./lab live`; console Model tab with the GGUF hash, quant, llama.cpp build, tok/s and `network: off` | "This is Muse Glimmer 30B, Meta's open weights, on a 24 gig M4. No API key, no cloud, and the Wi-Fi is off." (Say the quant the Model tab shows: `UD-Q3_K_XL` with Meta's DFlash drafter, the same build the benchmark used.) |
-| 0:38–1:15 | Console at 1x, then labelled 8x: the director's parallel tool calls; the proposer's picks with P(hit); the critic opens a render and vetoes a pick; press `a`; sealed cells reveal; CO2 moves into the pore | "The same model plays four roles. It plans, commits to predictions before it sees any result, critiques its own picks by looking at the structures, and buys ten DFT results per round." |
-| 1:15–1:40 | `calibrate_oracle`: the parity plot; the critic's `visual_rho`; the trace line that follows | Variant A (the run changed course): "We make it check its simulator against what it has paid for. What it does with the answer is its own call. Here it stopped trusting the cheap scores and moved to {{WHAT_IT_USED}}." Variant B (it did not): "We make it check its simulator against what it has paid for. What it does with the answer is its own call. Here it kept the cheap scores; across all runs, {{N_CHANGED}} of {{A5_N}} changed course after the check." |
-| 1:40–2:15 | Results page: arms with intervals and both baselines, discovery curves, the A6 ablation, Brier score, leak probe, the `prereg-v1` hash | "This was pre-registered before any test run. Against random it {{VS_RANDOM}}. Against the strongest baseline, greedy on the simulator, it {{VS_A2: beats / ties / loses}}; against a random forest it {{VS_RF}}. Here are the intervals. The leak probe shows {{LEAK_SENTENCE}}." |
-| 2:15–2:30 | Claim checker: "{{CLAIMS_N}} claims, {{CLAIMS_VERIFIED}} verified, {{CLAIMS_FLAGGED}} flagged" | "Every number it writes is checked against the computation it came from, and we publish the misses." |
-| 2:30–2:47 | Approval queue: a mutant relaxing in 3D, labelled "unvalidated · ML only"; approve | "It also proposes variations on what it found. Those are unvalidated, so a person decides." |
-| 2:47–3:00 | `git clone … && ./lab verify`; lower third "Built Oct 27 – Nov 4, 2026 · {{N_COMMITS}} commits since hackathon-start"; repo and site URLs | "Everything is open. Clone it, check every number without a model, or run it on your own Mac." |
+| 0:00–0:10 | Hook. The landing hero: a real DFT hit from ODAC23 as a 2×2×2 supercell, slowly orbiting inside the mesh of its pores; CO2 settles into its DFT-relaxed pose; small mono caption with id, formula, E_CO2 and E_H2O | "This is a metal-organic framework — a crystal sponge with pores a few atoms wide. The right one could pull CO2 straight out of the air." |
+| 0:10–0:24 | The problem. Results page, the Why this is hard scatter of 3,000 MOFs (water vs CO2, the 85% callout); cut to the atlas of all 3,000 MOFs on the landing page | "The catch is humidity. In 85% of these three thousand candidates, water grabs the binding site first. Checking just one with quantum chemistry takes hours of supercomputer time. So the real question is: which forty do you check?" |
+| 0:24–0:42 | What it runs on. live.mov from the Mac: Wi-Fi turned off, `./lab live`, console Model tab with muse-glimmer-30b, UD-Q3_K_XL + DFlash, tok/s, `network: off`. B-roll fallback: the Model tab | "fortyshots is an AI scientist that answers that question on a laptop. Meta's open-weights Muse Glimmer 30B, running locally — no API key, no cloud, Wi-Fi off. Meta's DFlash drafter more than doubles its speed." |
+| 0:42–0:52 | Built this week. Card styled like the site: left column Built Oct 27 – Nov 4 (the four-role agent and its 7 tools, the lab runtime for a laptop, the pre-registered benchmark and verifier, this site and console, the materials proposer); right column Used (Muse Glimmer 30B + DFlash drafter, Meta; ODAC23 DFT data + EquiformerV2, Meta FAIR; MACE-MP-0; llama.cpp); bottom: commits since hackathon-start, from git | "Everything here was built this week: the agent, the lab runtime, the benchmark and this site." |
+| 0:52–1:40 | Watch it work, at 1× then labelled 8×: the Director's parallel tool calls; the Proposer's picks with P(hit); the Critic opens a render and its parity plot and vetoes a pick; a key press approves the batch; sealed cells reveal and the binding-site close-up shows CO2 settling with Å labels; cut to the atlas, where the run's path grows round by round and hits flash | "One model plays four roles. The Director explores the pool with tools. The Proposer commits to ten picks — each with a probability it will hit, scored later. The Critic looks at the structures and its own plots, through Glimmer's vision, and vetoes weak picks. I approve, and the hidden DFT results from Meta FAIR's ODAC23 are revealed — here, CO2 settling into its pore. On the map of chemical space, you can watch where it searches." |
+| 1:40–1:58 | Self-check. `calibrate_oracle`: the parity plot and the trace line that follows | Variant A (the run changed course): "It also checks its own cheap simulator against what it has paid for. Here the simulator's ranking was weak, so it shifted to {{WHAT_IT_USED}}." Variant B (it did not): "It also checks its own cheap simulator against what it has paid for. Here it kept trusting the simulator's strongest picks, and the data backed it." |
+| 1:58–2:28 | The honest result. Results page: the arms chart with intervals and both baselines labelled, the discovery curves, the reliability plot, the leak probe line, the `prereg-v1` hash | "Does it work? We pre-registered the test before any run and scored it blind on five pools of five hundred. In forty lookups the agent picked {{H}} of the hidden hits. Random finds {{RANDOM_HITS}}; the strongest simple baseline finds {{A2_HITS}}. {{WIN_TIE_LOSS_SENTENCE}} Its stated probabilities score a Brier of {{BRIER}}, and a leak probe shows it isn't recalling answers." |
+| 2:28–2:36 | Claim check. The claim-check panel: claims, verified, flagged | "Every number it writes is checked against the computation it came from." |
+| 2:36–2:48 | The frontier. The approval queue with a proposed mutant relaxing in 3D, labelled unvalidated · ML only; approve. Without mutants in the run: the queue and the structure of the open batch | "Then it proposes new materials — modified frameworks, built and relaxed by simulation, ranked by what it learned. Unvalidated, so a person decides what gets tested next." |
+| 2:48–3:00 | Close. Terminal-style card: `git clone github.com/print-EddyMa/fortyshots && ./lab verify` typed, then the repo and site URLs; lower third "Built Oct 27 – Nov 4, 2026 · {{N_COMMITS}} commits since hackathon-start" | "The same loop works wherever experiments are expensive — electrolytes, catalysts. It's open: clone it and run it on your own laptop." |
 
-About 260 words of narration (one variant at 1:15). At a calm 140 words per minute that is under 2 minutes of speech, which leaves room for pauses on the key screens.
+About 390 words of narration (one variant at 1:40). At a calm 140 words per minute that is about 2:45 of speech, so keep the pauses short; `captions.py` refuses a cut that runs past 3:00.
 
-## Recording checklist (Tue Nov 3, about 2 hours)
+## Rubric coverage
 
-Setup:
-- [ ] `./lab update`
-- [ ] Mac on the charger. Low Power Mode off. Focus / Do Not Disturb on.
-- [ ] Quit every app except Terminal, the browser and QuickTime. Browser zoom 100%, a clean window with only the console tab.
-- [ ] `./lab doctor --rehearse` (it asks for the password if the Mac restarted). It ends with "Memory held up", or tells you to switch to `./lab live small`.
+| Rubric item | Where in the video |
+|---|---|
+| Impact (30%) | 0:00–0:24: a real sorbent, humidity as the reason direct air capture fails, 85% of 3,000 candidates lose to water, DFT is the expensive step. 2:36–3:00: proposing new frameworks, and the same loop for electrolytes and catalysts. |
+| Use of Meta AI tooling (25%) | 0:24–0:42: Muse Glimmer 30B open weights on the laptop, Wi-Fi off, Meta's DFlash drafter. 0:52–1:40: one model in four roles, parallel tool calls, structured output (the Proposer's P(hit) schema), Glimmer's vision on renders and plots, Meta FAIR's ODAC23 DFT labels. 0:42 card: EquiformerV2 (Meta FAIR) in the physics checks. |
+| Technical depth (20%) | 1:40–2:36: the simulator self-check, pre-registration, blind scoring on five pools, intervals and both baselines, Brier score, leak probe, claim checker. 0:52–1:40: binding-site distances from the DFT-relaxed geometry; the t-SNE atlas built from label-free descriptors. |
+| Demo (25%) | 0:52–1:40: the console replaying a real ledger, a live approval, the DFT reveal; 0:24–0:42: the live run on the Mac. |
+| Built during the hackathon | 0:42–0:52: the "Built this week" card with the commit count from git; 2:48–3:00: the lower third "Built Oct 27 – Nov 4, 2026 · N commits since hackathon-start". |
+| Bonus: Best Agentic | 0:52–1:58: Director, Proposer, Critic and Reporter with tools, self-calibration and a human gate. |
+| Bonus: Open-Weights, own hardware | 0:24–0:42: a 30B open-weights model on a 24 GB MacBook, no API key, Wi-Fi off. |
+| Bonus: Most Viral | The 40-second vertical clip in LAUNCH.md: the hook orbit, the 85% scatter, the 8× loop with the CO2 reveal, the atlas path, the result. |
 
-Live segment (one take is enough; you can retry):
-- [ ] Start a screen recording: Cmd-Shift-5 > Record Entire Screen.
-- [ ] On camera: turn Wi-Fi off from the menu bar.
-- [ ] `./lab live`, then in a second Terminal tab `./lab live run`. This is a demo run on the development pool P0, not part of the benchmark; the video says so in a caption.
-- [ ] Open the Model tab and hold on it for 3 seconds: hash, quant, build, tok/s, `network: off`.
-- [ ] Approve each batch with `a` when asked.
-- [ ] Stop the recording (Cmd-Ctrl-Esc) after the first batch is revealed; a few minutes is enough, and a short file keeps its quality through `push-media`. Save it as `live.mov` on the Desktop.
-- [ ] Note three times from the QuickTime playhead (seconds): Wi-Fi off, the Model tab on screen, your first `a`. They become `--live-cuts` below.
-- [ ] `./lab stop`. Turn Wi-Fi back on.
+## Recording checklist (Tue Nov 3, about 1 hour)
 
-Narration:
-- [ ] QuickTime > File > New Audio Recording. Quiet room, phone away. Read the narration column above, two takes. Save the better one as `voice.m4a` on the Desktop.
-
-Upload:
-- [ ] `./lab push` (the demo run), then `./lab push-media ~/Desktop/voice.m4a ~/Desktop/live.mov`. It commits both files to the orphan branch `media` (not `main`) and re-encodes anything over 95 MB, so `live.mov` may arrive as `live.mp4`. Both commands end with a line starting `pushed`.
+1. [ ] `./lab update`. Mac on the charger, Low Power Mode off, Do Not Disturb on, only Terminal, the browser and QuickTime open.
+2. [ ] `./lab doctor --rehearse`; it ends with "Memory held up" (or tells you to use `./lab live small`).
+3. [ ] **live.mov, about 60 s, one take.** Cmd-Shift-5 > Record Entire Screen. Turn Wi-Fi off from the menu bar; `./lab live`, then `./lab live run` in a second tab (a demo run on P0, captioned as such); open the Model tab for 3 s; when asked, press `a` to approve the first batch and wait for the reveal. Stop (Cmd-Ctrl-Esc), save as `live.mov` on the Desktop, note the seconds of Wi-Fi off, the Model tab and your `a`. `./lab stop`; Wi-Fi back on.
+4. [ ] **voice.m4a.** QuickTime > File > New Audio Recording, quiet room. Read the narration column straight through (one variant at 1:40), two takes; keep the better one as `voice.m4a` on the Desktop.
+5. [ ] `./lab push`, then `./lab push-media ~/Desktop/voice.m4a ~/Desktop/live.mov` (both end with a line starting `pushed`).
 
 Claude then cuts the video from your two files plus browser B-roll (captions, speed labels, lower third) and sends it back for review. You upload the final file as unlisted to a video account you already have and paste the link into SUBMISSION.md.
 
@@ -63,7 +62,7 @@ The tools are in `web/scripts/video/`; everything they write goes to `media/` (g
 web/scripts/video/fetch-media.sh
 
 # 2. The site with the real runs, then the browser B-roll of the showcase run
-#    (runs/index.json `showcase`, else the first A5 run on P1): 11 shots, each 1920x1080 and 1080x1920
+#    (runs/index.json `showcase`, else the first A5 run on P1): 18 shots, each 1920x1080 and 1080x1920
 (cd web && npm run build)
 node web/scripts/video/record-broll.mjs             # -> media/broll/*.webm + media/broll/shots.json
 #    one shot again: node web/scripts/video/record-broll.mjs --only calibrate-oracle

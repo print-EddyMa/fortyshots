@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Console } from '../console/Console';
 import { LIVE } from '../lib/config';
-import { loadEvents, loadNetwork, pickShowcase, subscribeLive } from '../lib/data';
+import { loadEvents, loadNetwork, loadSidecar, pickShowcase, subscribeLive } from '../lib/data';
 import { useIndex, useResults } from '../lib/useData';
 import { usePlayback, type Speed } from '../lib/usePlayback';
 import { href } from '../lib/router';
@@ -25,6 +25,7 @@ function RunConsole({ runId, results, query }: { runId: string; results: Results
     };
   }, []);
   const buffer = useRef<RunEvent[]>([]);
+  const proposed = useRef(false); // live: the ledger has Chemist proposals, so a sidecar may follow
 
   useEffect(() => {
     setEvents([]);
@@ -37,25 +38,35 @@ function RunConsole({ runId, results, query }: { runId: string; results: Results
         buffer.current = [];
         setEvents((prev) => [...prev, ...batch]);
       }, 100);
-      const stop = subscribeLive(
-        runId,
-        (e) => {
-          if (seen.has(e.seq)) return;
-          seen.add(e.seq);
-          buffer.current.push(e);
-        },
-        setLiveStatus,
-      );
+      const push = (e: RunEvent) => {
+        if (seen.has(e.seq)) return;
+        seen.add(e.seq);
+        if (e.kind === 'mutation') proposed.current = true;
+        buffer.current.push(e);
+      };
+      const stop = subscribeLive(runId, push, (st) => {
+        setLiveStatus(st);
+        // after the summary: append the prospective-mode sidecar, if the container has built this run's mutants
+        if (st === 'closed' && proposed.current) loadSidecar(runId).then((side) => side.forEach(push));
+      });
       return () => {
         stop();
         window.clearInterval(flush);
       };
     }
     let dead = false;
-    loadEvents(runId).then(
-      (ev) => !dead && setEvents(ev),
-      (e) => !dead && setError(String(e?.message ?? e)),
-    );
+    // the prospective-mode sidecar (built/invalid mutants) plays after the ledger; it is never part of it
+    // (fetched only for runs whose ledger has Chemist proposals, so other runs make no 404 requests)
+    loadEvents(runId)
+      .then(async (ev) => {
+        const last = ev.length ? ev[ev.length - 1].seq : -1;
+        const side = ev.some((e) => e.kind === 'mutation') ? await loadSidecar(runId) : [];
+        return [...ev, ...side.filter((e) => e.seq > last)];
+      })
+      .then(
+        (ev) => !dead && setEvents(ev),
+        (e) => !dead && setError(String(e?.message ?? e)),
+      );
     return () => {
       dead = true;
     };

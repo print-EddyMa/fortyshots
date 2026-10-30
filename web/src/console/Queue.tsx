@@ -3,6 +3,8 @@ import type { RunState } from '../lib/replay';
 import { loadPending, postHuman } from '../lib/data';
 import { num } from '../lib/format';
 import { Formula } from '../components/Formula';
+import type { MutantIndex, MutantRow } from '../lib/types';
+import { Mutants } from './Mutants';
 
 // The human gate takes one decision per round (CONTRACTS addenda): approve the batch, or reject some picks,
 // which the agent then replaces. `r` marks the current pick for rejection; `a` sends the decision.
@@ -27,7 +29,16 @@ function saveLocal(runId: string, d: Record<number, Decision>) {
   }
 }
 
-export function Queue({ state, runId, live }: { state: RunState; runId: string; live: boolean }) {
+export interface QueueProps {
+  state: RunState;
+  runId: string;
+  live: boolean;
+  mutants?: MutantIndex | null;
+  mutantSel?: string | null;
+  onMutant?: (m: MutantRow | null) => void;
+}
+
+export function Queue({ state, runId, live, mutants = null, mutantSel = null, onMutant = () => undefined }: QueueProps) {
   const [decisions, setDecisions] = useState<Record<number, Decision>>(() => (live ? {} : loadLocal(runId)));
   const [marked, setMarked] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
@@ -228,21 +239,7 @@ export function Queue({ state, runId, live }: { state: RunState; runId: string; 
           )}
         </>
       )}
-      {state.mutations.length > 0 && (
-        <>
-          <div className="c-head q-decided-head">
-            <span>Proposed mutants</span>
-            <span className="faint mono-sm">unvalidated · ML only</span>
-          </div>
-          <ul className="q-decided">
-            {state.mutations.map((m) => (
-              <li key={m.seq} className="mono-sm">
-                {m.payload.parent} → {typeof m.payload.spec === 'string' ? m.payload.spec : JSON.stringify(m.payload.spec)} · <span className="faint">{m.payload.status}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <Mutants index={mutants} state={state} runId={runId} live={live} selected={mutantSel} onSelect={onMutant} />
     </div>
   );
 }

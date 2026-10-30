@@ -36,26 +36,30 @@ LIVE_NOTE = ("Live demo run", "· development pool P0, not part of the benchmark
 
 # keyword in the picture column -> clips. weight: share of the row; max: cap in seconds; at: mark or seconds.
 DEFAULT_MAIN = [
-    ("Black frame", [{"card": "title", "max": 8.0}, {"shot": "landing-headline", "at": "hero", "weight": 1}]),
-    ("scatter", [{"shot": "results-scatter", "weight": 1}]),
-    ("Wi-Fi", [{"live": True, "weight": 1}]),
-    ("Console at 1x", [
-        {"shot": "console-1x", "weight": 0.24},
-        {"shot": "console-8x", "weight": 0.40},
-        {"shot": "critic-veto", "weight": 0.16, "at": 0.4},
-        {"shot": "dft-reveal", "weight": 0.20, "at": 0.3},
+    ("Hook.", [{"shot": "hero-orbit", "at": "relax", "weight": 1}]),
+    ("The problem.", [{"shot": "why-hard", "weight": 0.55}, {"shot": "atlas-path", "at": "overview", "weight": 0.45, "max": 4.8}]),
+    ("What it runs on.", [{"live": True, "weight": 1}]),
+    ("Built this week.", [{"shot": "built-card", "weight": 1}]),
+    ("Watch it work", [
+        {"shot": "console-1x", "weight": 0.13},
+        {"shot": "console-8x", "weight": 0.27},
+        {"shot": "critic-veto", "weight": 0.13, "at": 0.4},
+        {"shot": "approval-queue", "at": "approve", "weight": 0.06, "max": 3.0},
+        {"shot": "dft-reveal", "weight": 0.11, "at": 0.3},
+        {"shot": "binding-site", "at": "site", "weight": 0.13},
+        {"shot": "atlas-path", "at": "play", "weight": 0.17},
     ]),
-    ("calibrate_oracle", [{"shot": "calibrate-oracle", "weight": 1}]),
-    ("arms with intervals", [{"shot": "results-arms", "weight": 1}]),
-    ("Claim checker", [{"shot": "claim-check", "weight": 1}]),
-    ("Approval queue", [{"shot": "approval-queue", "weight": 1}]),
-    ("git clone", [{"shot": "landing-headline", "at": "scroll", "weight": 0.5, "max": 7.0}, {"card": "end", "weight": 0.5}]),
+    ("Self-check.", [{"shot": "calibrate-oracle", "weight": 1}]),
+    ("The honest result.", [{"shot": "results-arms", "weight": 1}]),
+    ("Claim check.", [{"shot": "claim-check", "weight": 1}]),
+    ("The frontier.", [{"shot": "approval-queue", "at": "mutants", "weight": 1}]),
+    ("Close.", [{"shot": "close-card", "weight": 1}]),
 ]
 DEFAULT_X = [
-    ("Black", [{"card": "x_title", "weight": 1}]),
-    ("CO2 moving", [{"shot": "dft-reveal", "at": "play", "weight": 1}]),
-    ("timelapse", [{"shot": "console-8x", "at": "play", "weight": 1}]),
-    ("calibrate_oracle", [{"shot": "calibrate-oracle", "at": "play", "weight": 1}]),
+    ("Hook orbit", [{"shot": "hero-orbit", "at": "relax", "weight": 1}]),
+    ("85% scatter", [{"shot": "why-hard", "weight": 1}]),
+    ("timelapse", [{"shot": "console-8x", "at": "play", "weight": 0.6}, {"shot": "binding-site", "at": "site", "weight": 0.4}]),
+    ("The atlas", [{"shot": "atlas-path", "at": "play", "weight": 1}]),
     ("Arms chart", [{"shot": "results-arms", "at": "arms", "weight": 1}]),
 ]
 

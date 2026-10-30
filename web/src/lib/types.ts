@@ -79,3 +79,29 @@ export interface Pools { pools: Record<string, PoolRow[]> }
 export interface Structure {
   id: string; cell: number[][]; numbers: number[]; ads: number[]; pos: number[][]; pos_relaxed: number[][];
 }
+
+// Prospective mode (physics/prospective.py): runs/<id>/mutants/{index.json, <mid>.json}. Never benchmark data.
+export interface MutantSpec { op: 'functionalize' | 'swap_metal'; group?: string; site?: string | number; from?: string; to?: string }
+export interface MutantValidity { clash_ratio: number; dV_frac: number; fmax: number; steps: number; converged: boolean; charge: string; valid: boolean }
+export interface MaceBinding { E_CO2_mace: number; E_H2O_mace: number; S_mace: number }
+export interface Eqv2Binding { E_CO2_eqv2?: number; E_H2O_eqv2?: number; S_eqv2?: number }
+
+export interface MutantRow {
+  id: string; proposal_seq: number; file: string | null; parent: string; parent_formula: string | null;
+  parent_S: number | null; parent_hit: boolean | null; parent_mace: MaceBinding | null;
+  spec: MutantSpec; spec_text: string; rationale: string; status: 'built' | 'invalid'; reason: string | null;
+  validity: MutantValidity | null; formula: string | null; natoms: number | null;
+  descriptors: Record<string, number | null> | null; pred_S: number | null; pred_std: number | null; rank: number | null;
+  mace: MaceBinding | null; eqv2: Eqv2Binding | null; n_frames: number; steps: number | null; relax_s: number | null; label: string;
+}
+
+export interface MutantIndex {
+  run_id: string; generated: string; label: string; note: string; mace_note: string;
+  surrogate: { model: string; seed: number; n_train: number; n_bought: number; skipped?: string };
+  n_proposed: number; n_built: number; mutants: MutantRow[]; wall_s: number;
+}
+
+export interface MutantDoc extends Structure {
+  parent: string; spec: MutantSpec; label: string; frames: { cell: number[][]; pos: number[][] }[]; n_steps: number;
+  validity: MutantValidity; mace: MaceBinding | null;
+}

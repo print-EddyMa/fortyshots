@@ -1,0 +1,478 @@
+/* Chemistry visuals: the landing specimen (3D hero), the atlas, the periodic table. Same tokens as site.css. */
+
+/* ---------- specimen: the hero MOF */
+.specimen {
+  margin: 64px 0 0;
+}
+
+.specimen-frame {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0d0d0d;
+  border: 1px solid #00000014;
+  box-shadow:
+    0 30px 70px -18px rgba(0, 0, 0, 0.45),
+    0 10px 24px -10px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  height: clamp(420px, 46vw, 600px);
+  color: #ededed;
+}
+
+.specimen-host {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.specimen-host:active {
+  cursor: grabbing;
+}
+
+.specimen-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: #858585;
+}
+
+.specimen-tl {
+  position: absolute;
+  left: 20px;
+  top: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #b4b4b4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.specimen-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e4b;
+  opacity: 0.45;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.specimen-dot[data-phase='relaxing'] {
+  opacity: 1;
+  animation: pulse 0.9s ease-in-out infinite alternate;
+}
+
+.specimen-dot[data-phase='relaxed'] {
+  opacity: 1;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.specimen-ctl {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  display: flex;
+  gap: 2px;
+}
+
+.specimen-ctl button {
+  border: 0;
+  background: transparent;
+  color: #8b8b8b;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease);
+}
+
+.specimen-ctl button:hover {
+  color: #ededed;
+}
+
+.specimen-cap {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 20px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #d4d4d4;
+  pointer-events: none;
+}
+
+.specimen-cap .faint {
+  color: #858585;
+}
+
+.specimen-cap sub {
+  font-size: 0.75em;
+  vertical-align: -0.2em;
+  line-height: 0;
+}
+
+.specimen-legend {
+  flex-basis: 100%;
+}
+
+@media (max-width: 640px) {
+  .specimen {
+    margin-top: 48px;
+  }
+
+  .specimen-frame {
+    height: 440px;
+  }
+
+  .specimen-cap {
+    left: 14px;
+    right: 14px;
+    bottom: 12px;
+    font-size: 11.5px;
+    line-height: 17px;
+  }
+
+  .specimen-tl {
+    left: 14px;
+    top: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .specimen-dot[data-phase='relaxing'] {
+    animation: none;
+  }
+}
+
+/* ---------- atlas */
+.atlas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 40px;
+  align-items: start;
+}
+
+.atlas-map {
+  position: relative;
+  min-width: 0;
+}
+
+.atlas-map canvas {
+  display: block;
+  width: 100%;
+  touch-action: pan-y;
+}
+
+.atlas-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  z-index: 2;
+  transform: translate(12px, -50%);
+}
+
+.atlas-tip.flip {
+  transform: translate(calc(-100% - 12px), -50%);
+}
+
+.atlas-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.atlas-count {
+  font-family: var(--mono);
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.atlas-count .unit {
+  color: var(--fg-faint);
+  font-size: 15px;
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+
+.atlas-rounds {
+  border-top: 1px solid var(--rule);
+}
+
+.atlas-rounds > div {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  align-items: center;
+  color: var(--fg-faint);
+  transition: color var(--dur) var(--ease);
+}
+
+.atlas-rounds > div[data-on='1'] {
+  color: var(--fg);
+}
+
+.atlas-ticks {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.atlas-ticks i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+}
+
+.atlas-ticks i[data-s='miss'] {
+  background: var(--fg-faint);
+  border-color: var(--fg-faint);
+}
+
+.atlas-ticks i[data-s='hit'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.atlas-key {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--fg-muted);
+}
+
+.atlas-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-key svg {
+  flex: none;
+}
+
+@media (max-width: 860px) {
+  .atlas {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
+/* dark (console) variant */
+[data-theme='dark'] .atlas-tip {
+  background: #1a1a1a;
+}
+
+/* ---------- periodic table */
+.ptable {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.ptable .gap {
+  grid-column: 1 / -1;
+  height: 10px;
+}
+
+.pt-cell {
+  position: relative;
+  aspect-ratio: 1 / 0.92;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 5px;
+  text-align: left;
+  font: inherit;
+  color: var(--fg-faint);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: default;
+}
+
+.pt-cell .sym {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.pt-cell .n {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums slashed-zero;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pt-cell.present {
+  cursor: pointer;
+  color: var(--fg);
+  border-color: transparent;
+}
+
+.pt-cell.present.light-text {
+  color: #fff;
+}
+
+.pt-cell.present:hover,
+.pt-cell.present:focus-visible,
+.pt-cell.present[aria-pressed='true'] {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+  z-index: 1;
+}
+
+.pt-cell.none {
+  border-color: transparent;
+  background: transparent;
+}
+
+.pt-detail {
+  margin-top: 16px;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+
+.pt-detail .mono {
+  color: var(--fg);
+}
+
+.pt-scale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.pt-scale .bar {
+  display: flex;
+  height: 10px;
+  width: 180px;
+}
+
+.pt-scale .bar i {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .ptable {
+    gap: 1px;
+  }
+
+  .pt-cell {
+    padding: 1px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pt-cell .sym {
+    font-size: 9px;
+    line-height: 10px;
+  }
+
+  .pt-cell .n {
+    display: none;
+  }
+}
+
+/* ---------- small multiples */
+.multiples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 32px;
+}
+
+@media (max-width: 860px) {
+  .multiples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 20px;
+  }
+}
+
+.mult-title {
+  font-size: 13px;
+  color: var(--fg);
+  margin-bottom: 2px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mult-title .faint {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.section .tour {
+  margin-top: 8px;
+}
+
+/* ---------- console viewer: binding site and charges */
+.viewer-site {
+  margin-top: 2px;
+  color: var(--fg-muted);
+}
+
+.viewer-site .accent {
+  color: var(--accent);
+}
+
+.viewer-charge {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.q-bar {
+  display: inline-flex;
+  height: 8px;
+  width: 64px;
+}
+
+.q-bar i {
+  flex: 1;
+}
+
+.callout {
+  color: var(--fg);
+  font-size: 1.05em;
+}

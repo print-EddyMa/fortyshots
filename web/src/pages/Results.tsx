@@ -9,6 +9,7 @@ import { derive } from '../lib/replay';
 import type { IndexEntry, PoolRow, Pools, Results, RunEvent } from '../lib/types';
 import { useIndex, usePools, useResults } from '../lib/useData';
 import { PREREG_URL } from '../lib/config';
+import { PeriodicTable } from '../components/PeriodicTable';
 
 const S = (co2: number, h2o: number) => co2 + Math.max(0, co2 - h2o + 0.1);
 
@@ -283,26 +284,43 @@ export function ResultsPage() {
       </section>
 
       <section className="wrap section">
-        <h2 className="fig-title">Why this is hard</h2>
-        <p className="fig-sub">
-          DFT binding energy of CO2 against water for every MOF in the six pools. Water binds more strongly than CO2 in 85% of them (above the
-          dashed line), which is why sorbents fail in humid air. Filled: hits, which bind CO2 below −0.5 eV and more strongly than water.
-        </p>
+        <h2 className="fig-title" id="why-hard">Why this is hard</h2>
         {pools.data ? (
           (() => {
             const rows = Object.values(pools.data.pools).flat();
             const hits = rows.filter((r) => r.hit).length;
+            const waterWins = rows.filter((r) => r.E_H2O < r.E_CO2).length / (rows.length || 1);
             return (
+              <>
+              <p className="fig-sub">
+                DFT binding energy of CO2 against water for every MOF in the six pools. Water binds more strongly than CO2 in{' '}
+                <span className="callout mono">{Math.round(waterWins * 100)}%</span> of them (above the dashed line), which is why sorbents fail
+                in humid air. Filled: hits, which bind CO2 below −0.5 eV and more strongly than water.
+              </p>
               <ScatterChart
                 points={rows.map((r) => ({ x: r.E_H2O, y: r.E_CO2, strong: r.hit, id: r.id }))}
                 xLabel="E water (eV)"
                 yLabel="E CO2 (eV)"
                 height={360}
                 ariaLabel={`CO2 versus water binding energy for ${rows.length} MOFs, ${hits} hits`}
-                annotation={`n = ${rows.length.toLocaleString()} MOFs · ${hits} hits (${num((100 * hits) / rows.length, 1)}%) · dashed: equal binding · ODAC23 DFT`}
+                annotation={`n = ${rows.length.toLocaleString()} MOFs · ${hits} hits (${num((100 * hits) / rows.length, 1)}%) · water binds more strongly in ${num(waterWins * 100, 0)}% · dashed: equal binding · ODAC23 DFT`}
               />
+              </>
             );
           })()
+        ) : (
+          <p className="muted">{pools.error ?? 'Loading pools…'}</p>
+        )}
+      </section>
+
+      <section className="wrap section" id="metals">
+        <h2 className="fig-title">Which metals bind CO2 over water</h2>
+        <p className="fig-sub">
+          Every metal in the six pools, coloured by the share of MOFs containing it that are DFT hits. Each cell: MOFs with that metal ·
+          hits. The agent sees the metals; it does not see this table.
+        </p>
+        {pools.data ? (
+          <PeriodicTable rows={Object.values(pools.data.pools).flat()} label="Periodic table of DFT hit rates by metal" />
         ) : (
           <p className="muted">{pools.error ?? 'Loading pools…'}</p>
         )}

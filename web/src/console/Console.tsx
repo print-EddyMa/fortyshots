@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { bestCandidate, derive, type RunState } from '../lib/replay';
 import type { Playback } from '../lib/usePlayback';
-import type { Results, RunEvent } from '../lib/types';
+import type { MutantIndex, MutantRow, Results, RunEvent } from '../lib/types';
+import { loadMutants, runAsset } from '../lib/data';
 import { Viewer } from '../components/Viewer';
 import { DiscoveryChart, type CurveSeries } from '../components/Charts';
 import { TopBar } from './TopBar';
@@ -10,9 +11,11 @@ import { CandidateTable } from './CandidateTable';
 import { Trace } from './Trace';
 import { Queue } from './Queue';
 import { ModelTab } from './ModelTab';
+import { MapTab } from './MapTab';
 import './console.css';
 
-type Tab = 'trace' | 'queue' | 'model';
+type Tab = 'trace' | 'queue' | 'map' | 'model';
+const TABS: Tab[] = ['trace', 'queue', 'map', 'model'];
 
 export interface ConsoleProps {
   runId: string;
@@ -31,6 +34,19 @@ export function Console({ runId, events, pb, results, embedded, liveStatus, live
   const [userPicked, setUserPicked] = useState(false);
   const [morphKey, setMorphKey] = useState<number | null>(null);
   const [focusCall, setFocusCall] = useState<string | null>(null);
+  // prospective mutants (runs/<id>/mutants/index.json): selecting one shows its MACE relaxation in the viewer
+  const [mutants, setMutants] = useState<MutantIndex | null>(null);
+  const [mutantSel, setMutantSel] = useState<MutantRow | null>(null);
+  const hasProposals = useMemo(() => events.some((e) => e.kind === 'mutation'), [events]);
+  useEffect(() => {
+    let dead = false;
+    setMutants(null);
+    setMutantSel(null);
+    if (hasProposals) loadMutants(runId).then((m) => !dead && setMutants(m));
+    return () => {
+      dead = true;
+    };
+  }, [runId, hasProposals]);
   const lastRevealSeq = useRef<number | null>(null);
 
   const best = bestCandidate(state.cands);
@@ -92,6 +108,7 @@ export function Console({ runId, events, pb, results, embedded, liveStatus, live
             bestId={best?.id ?? null}
             selected={selected}
             onSelect={(id) => {
+              setMutantSel(null);
               setSelected(id);
               setUserPicked(true);
             }}
@@ -108,10 +125,15 @@ export function Console({ runId, events, pb, results, embedded, liveStatus, live
           </div>
         </section>
         <aside className="c-right" aria-label="Structure and agent">
-          <Viewer id={selected} revealed={sel?.S != null} morphKey={morphKey} />
+          <Viewer
+            id={selected}
+            revealed={sel?.S != null}
+            morphKey={morphKey}
+            mutant={mutantSel?.file ? { id: mutantSel.id, url: runAsset(runId, mutantSel.file) } : null}
+          />
           <div className="c-tabs">
             <div className="tablist" role="tablist" aria-label="Agent panels">
-              {(['trace', 'queue', 'model'] as Tab[]).map((t) => (
+              {TABS.map((t) => (
                 <button
                   key={t}
                   role="tab"
@@ -121,23 +143,25 @@ export function Console({ runId, events, pb, results, embedded, liveStatus, live
                   tabIndex={tab === t ? 0 : -1}
                   onClick={() => setTab(t)}
                   onKeyDown={(e) => {
-                    const order: Tab[] = ['trace', 'queue', 'model'];
                     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                      const i = order.indexOf(tab) + (e.key === 'ArrowRight' ? 1 : -1);
-                      const next = order[(i + 3) % 3];
+                      const i = TABS.indexOf(tab) + (e.key === 'ArrowRight' ? 1 : -1);
+                      const next = TABS[(i + TABS.length) % TABS.length];
                       setTab(next);
                       document.getElementById(`tab-${next}`)?.focus();
                     }
                   }}
                 >
-                  {t === 'trace' ? 'Trace' : t === 'queue' ? 'Queue' : 'Model'}
+                  {t === 'trace' ? 'Trace' : t === 'queue' ? 'Queue' : t === 'map' ? 'Map' : 'Model'}
                   {t === 'queue' && pendingCount > 0 && <span className="tab-count mono">{pendingCount}</span>}
                 </button>
               ))}
             </div>
             <div className="tabpanel" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
               {tab === 'trace' && <TraceMemo state={state} runId={runId} focusCall={focusCall} active={!pb.ended && (pb.playing || pb.live)} />}
-              {tab === 'queue' && <Queue state={state} runId={runId} live={pb.live} />}
+              {tab === 'queue' && (
+                <Queue state={state} runId={runId} live={pb.live} mutants={mutants} mutantSel={mutantSel?.id ?? null} onMutant={setMutantSel} />
+              )}
+              {tab === 'map' && <MapTab state={state} />}
               {tab === 'model' && <ModelTab state={state} />}
             </div>
           </div>

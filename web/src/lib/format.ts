@@ -84,3 +84,18 @@ export function shortSha(s: string | null | undefined, n = 7): string {
   if (!s) return DASH;
   return /^[0-9a-f]+$/i.test(s) && s.length > n ? s.slice(0, n) : s;
 }
+
+const SITE_TEXT: Record<string, string> = {
+  near_co2: 'the C-H nearest the CO2 pocket',
+  near_metal: 'the C-H nearest a metal',
+  far_from_metal: 'the C-H farthest from any metal',
+};
+
+/** Readable Chemist mutation spec ({op, group, site} or {op, from, to}; older specs used kind/new_metal). */
+export function mutationText(spec: any): string {
+  if (!spec || typeof spec !== 'object') return String(spec ?? DASH);
+  const op = spec.op ?? (spec.kind === 'metal_swap' ? 'swap_metal' : spec.kind);
+  if (op === 'functionalize') return `functionalize ${spec.group ?? '?'} at ${SITE_TEXT[spec.site] ?? `C-H #${spec.site ?? 0}`}`;
+  if (op === 'swap_metal') return `swap ${spec.from ?? '?'} → ${spec.to ?? spec.new_metal ?? '?'}`;
+  return JSON.stringify(spec);
+}
