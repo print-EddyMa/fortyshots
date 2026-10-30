@@ -49,7 +49,8 @@ finished exploring, and "note" holds your sentences for the Proposer once done."
 PROPOSER = """ROLE: Proposer, round {round} of {rounds}.
 Commit exactly {n} MOFs to buy with DFT now. Choose unbought ids that appear in tool results. For each pick give \
 p_hit, your probability from 0 to 1 that DFT will call it a hit; p_hit is scored against the outcome, so state what \
-you actually believe. Add a one-sentence rationale and the call ids of the evidence. Reply with JSON only."""
+you actually believe. Add a short rationale (at most 15 words) and the call ids of the evidence. Think briefly, then \
+reply with JSON only."""
 
 PROPOSER_SHORT = """
 Keep each rationale to 20 words or fewer."""

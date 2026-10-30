@@ -41,7 +41,8 @@ from .roles.schemas import (
 from .tools import ARM_TOOLS, PoolEnv, ToolOutput, score_probe, tool_schemas
 
 STRENGTHS = ("low", "medium", "high", "xhigh")
-ROLE_STRENGTH = {"director": "medium", "proposer": "medium", "critic": "medium", "reporter": "low", "chemist": "medium",
+# Tuned to the base M4 (doctor, Oct 30): generation, not prefill, dominates; "low" cuts reasoning ~7x vs "high".
+ROLE_STRENGTH = {"director": "low", "proposer": "medium", "critic": "low", "reporter": "low", "chemist": "medium",
                  "probe": "low"}
 MAX_TOKENS = {"director": 2048, "proposer": 3072, "critic": 2048, "reporter": 2048, "chemist": 2048, "probe": 3072}
 MAX_DIRECTOR_TURNS = 8

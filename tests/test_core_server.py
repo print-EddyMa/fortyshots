@@ -14,8 +14,8 @@ from fortyshots.server import create_app
 
 
 def test_live_server_api(tmp_path):
-    cfg = make_cfg(tmp_path, "A4")
-    summary, camp = run(cfg, run_id="mock-A4-P0-s0-202610300003")
+    cfg = make_cfg(tmp_path, "A5")
+    summary, camp = run(cfg, run_id="mock-A5-P0-s0-202610300003")
     site = tmp_path / "site"
     site.mkdir()
     (site / "index.html").write_text("<html>fortyshots</html>")

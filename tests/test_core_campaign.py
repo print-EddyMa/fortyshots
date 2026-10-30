@@ -88,10 +88,11 @@ class Crash(RuntimeError):
     pass
 
 
-@pytest.mark.parametrize("crash_at", [5, 17, 27])
-def test_resume_after_crash_matches_uninterrupted(tmp_path, crash_at):
+@pytest.mark.parametrize("crash_frac", [0.2, 0.55, 0.9])
+def test_resume_after_crash_matches_uninterrupted(tmp_path, crash_frac):
     ref, ref_camp = run(make_cfg(tmp_path / "a", "A5"), run_id="mock-A5-P0-s0-202610300000")
     n_total = len(ref_camp.client.http._transport.requests)
+    crash_at = max(2, int(n_total * crash_frac))
     count = {"n": 0}
 
     def hook(req, resp):
