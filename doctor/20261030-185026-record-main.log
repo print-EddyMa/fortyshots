@@ -50,3 +50,7 @@ start A4-P2-s0-202610310356
 [lab] a campaign finished; pushing it: pushed: 7 new or changed item(s) to branch runs-mac (bbcf3bf)
 {"run_id": "A4-P2-s0-202610310356", "hits": 1, "spent": 40, "duration_s": 1954.1, "aborted": false}
 start A4-P3-s0-202610310428
+
+[lab] a campaign finished; pushing it: pushed: 8 new or changed item(s) to branch runs-mac (e9ce515)
+{"run_id": "A4-P3-s0-202610310428", "hits": 2, "spent": 40, "duration_s": 2563.3, "aborted": false}
+start A4-P4-s0-202610310511
