@@ -139,7 +139,7 @@ export function MethodPage() {
           before any test-pool run. Changes after the freeze are listed in DEVIATIONS.md.
         </p>
         <ul>
-          <li>Primary endpoint: mean hits at 40 for A5 minus A3, pool-stratified permutation test, one-sided.</li>
+          <li>Primary endpoint: mean hits at 40 for A5 minus A2 (MACE-greedy, the strongest baseline), pool-stratified permutation test, one-sided. A5 minus A3 (random forest) is secondary.</li>
           <li>Secondary: A5 vs A0 and A6, enrichment, lookups to first hit, the discovery curve, Brier score, Critic accuracy, claim-check pass rate.</li>
           <li>Uncertainty: hierarchical bootstrap over pools, then seeds; 95% intervals. With few LLM runs per arm the intervals are wide, and the results page says so.</li>
           <li>If A5 does not beat A3, the headline stays “hits in 40 against random” and the loss or tie is stated on the results page.</li>

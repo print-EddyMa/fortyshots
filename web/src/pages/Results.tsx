@@ -345,7 +345,7 @@ export function ResultsPage() {
       <section className="wrap section">
         <h2 className="fig-title">Pre-registered tests</h2>
         <p className="fig-sub">
-          Primary endpoint: A5 minus A3 in mean hits at 40, pool-stratified permutation test, one-sided. Frozen in{' '}
+          Primary endpoint: A5 minus A2 (MACE-greedy, the strongest baseline) in mean hits at 40, pool-stratified permutation test, one-sided. Frozen in{' '}
           <a className="link" href={PREREG_URL}>
             PREREG.md
           </a>{' '}
