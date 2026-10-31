@@ -50,3 +50,39 @@ start A4-P2-s0-202610310356
 [lab] a campaign finished; pushing it: pushed: 7 new or changed item(s) to branch runs-mac (bbcf3bf)
 {"run_id": "A4-P2-s0-202610310356", "hits": 1, "spent": 40, "duration_s": 1954.1, "aborted": false}
 start A4-P3-s0-202610310428
+
+[lab] a campaign finished; pushing it: pushed: 8 new or changed item(s) to branch runs-mac (e9ce515)
+{"run_id": "A4-P3-s0-202610310428", "hits": 2, "spent": 40, "duration_s": 2563.3, "aborted": false}
+start A4-P4-s0-202610310511
+
+[lab] a campaign finished; pushing it: pushed: 9 new or changed item(s) to branch runs-mac (e5244e4)
+{"run_id": "A4-P4-s0-202610310511", "hits": 2, "spent": 40, "duration_s": 2595.7, "aborted": false}
+start A4-P5-s0-202610310554
+
+[lab] a campaign finished; pushing it: pushed: 10 new or changed item(s) to branch runs-mac (c02170b)
+{"run_id": "A4-P5-s0-202610310554", "hits": 1, "spent": 40, "duration_s": 1501.6, "aborted": false}
+start L-P1-s0-202610310619
+
+[lab] a campaign finished; pushing it: pushed: 11 new or changed item(s) to branch runs-mac (25793cd)
+{"run_id": "L-P1-s0-202610310619", "hits": 2, "spent": 0, "duration_s": 1603.7, "aborted": false}
+start L2-P1-s0-202610310646
+
+[lab] a campaign finished; pushing it: pushed: 12 new or changed item(s) to branch runs-mac (ab2c597)
+{"run_id": "L2-P1-s0-202610310646", "hits": 1, "spent": 0, "duration_s": 5669.7, "aborted": false}
+
+==> Plan 'main' summary
+        A5-P1-s0-202610302250              1/40 hits/lookups  53.3 min
+        A5-P2-s0-202610302344              2/40 hits/lookups  47.8 min
+        A5-P3-s0-202610310031              2/40 hits/lookups  51.9 min
+        A5-P4-s0-202610310123              1/40 hits/lookups  66.2 min
+        A5-P5-s0-202610310229              1/40 hits/lookups  49.0 min
+        A4-P1-s0-202610310318              1/40 hits/lookups  37.3 min
+        A4-P2-s0-202610310356              1/40 hits/lookups  32.6 min
+        A4-P3-s0-202610310428              2/40 hits/lookups  42.7 min
+        A4-P4-s0-202610310511              2/40 hits/lookups  43.3 min
+        A4-P5-s0-202610310554              1/40 hits/lookups  25.0 min
+        L-P1-s0-202610310619               2/0 hits/lookups  26.7 min
+        L2-P1-s0-202610310646              1/0 hits/lookups  94.5 min
+        swap growth during the plan: 3.62 GB; network now: on
+  ok    Stopped model server (pid 9117)
+  ok    Plan 'main' done.

@@ -1,0 +1,18 @@
+{
+  "kind": "record",
+  "plan": "main",
+  "ts": "20261030-185026",
+  "profile": "default",
+  "started": 1793400643,
+  "ended": 1793434868,
+  "attempts": 1,
+  "exit": 0,
+  "interrupted": false,
+  "network_start": "on",
+  "network_end": "on",
+  "memory": {
+    "swap_before_mb": 7369,
+    "swap_max_growth_mb": 3706
+  },
+  "mock": false
+}
