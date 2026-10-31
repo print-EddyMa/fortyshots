@@ -1,0 +1,52 @@
+
+==> Recording plan 'main': 12 campaigns (log: doctor/20261030-185026-record-main.log)
+         1. A5 on P1, seed 0
+         2. A5 on P2, seed 0
+         3. A5 on P3, seed 0
+         4. A5 on P4, seed 0
+         5. A5 on P5, seed 0
+         6. A4 on P1, seed 0
+         7. A4 on P2, seed 0
+         8. A4 on P3, seed 0
+         9. A4 on P4, seed 0
+        10. A4 on P5, seed 0
+        11. L on P1, seed 0
+        12. L2 on P1, seed 0
+        Finished campaigns are skipped and unfinished ones resume, so running this again is safe.
+        network: on
+  ok    Keeping the Mac awake (caffeinate -dims). Leave the lid open.
+  ok    GPU memory limit: 20480 MB
+
+==> Starting Muse Glimmer 30B: profile default (unsloth UD-Q3_K_XL + vision + Meta DFlash drafter, 32K context. Measured on the base M4 (Oct 29): 6.8 tok/s decode, 34 tok/s prefill. Used for recorded campaigns.)
+        llama-server -m /Users/eddyma/glimmer/Muse-Glimmer-30B-UD-Q3_K_XL.gguf --mmproj /Users/eddyma/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf -md /Users/eddyma/glimmer/dflash-Muse-Glimmer-30B-Q4_K_M.gguf -ngld 99 -c 32768 -a muse-glimmer-30b -ngl 99 -np 1 --jinja --temp 1.0 --top-p 0.95 --top-k 64 --reasoning-budget 1024 --cache-ram 1024 --ctx-checkpoints 8 --image-max-tokens 1024 --metrics --host 127.0.0.1 --port 8080
+        Loading (log: /Users/eddyma/glimmer/server.log). This takes 20-90 s.
+  ok    Model ready in 17 s: http://127.0.0.1:8080 (profile default)
+
+==> fortyshots record main (attempt 1 of 3)
+start A5-P1-s0-202610302250
+{"run_id": "A5-P1-s0-202610302250", "hits": 1, "spent": 40, "duration_s": 3195.6, "aborted": false}
+start A5-P2-s0-202610302344
+
+[lab] a campaign finished; pushing it: pushed: 2 new or changed item(s) to branch runs-mac (99af416)
+{"run_id": "A5-P2-s0-202610302344", "hits": 2, "spent": 40, "duration_s": 2865.4, "aborted": false}
+start A5-P3-s0-202610310031
+
+[lab] a campaign finished; pushing it: pushed: 3 new or changed item(s) to branch runs-mac (0f08312)
+{"run_id": "A5-P3-s0-202610310031", "hits": 2, "spent": 40, "duration_s": 3114.1, "aborted": false}
+start A5-P4-s0-202610310123
+
+[lab] a campaign finished; pushing it: pushed: 4 new or changed item(s) to branch runs-mac (a182a94)
+{"run_id": "A5-P4-s0-202610310123", "hits": 1, "spent": 40, "duration_s": 3973.4, "aborted": false}
+start A5-P5-s0-202610310229
+
+[lab] a campaign finished; pushing it: pushed: 5 new or changed item(s) to branch runs-mac (0ba9729)
+{"run_id": "A5-P5-s0-202610310229", "hits": 1, "spent": 40, "duration_s": 2940.9, "aborted": false}
+start A4-P1-s0-202610310318
+
+[lab] a campaign finished; pushing it: pushed: 6 new or changed item(s) to branch runs-mac (42fa3e2)
+{"run_id": "A4-P1-s0-202610310318", "hits": 1, "spent": 40, "duration_s": 2235.1, "aborted": false}
+start A4-P2-s0-202610310356
+
+[lab] a campaign finished; pushing it: pushed: 7 new or changed item(s) to branch runs-mac (bbcf3bf)
+{"run_id": "A4-P2-s0-202610310356", "hits": 1, "spent": 40, "duration_s": 1954.1, "aborted": false}
+start A4-P3-s0-202610310428
