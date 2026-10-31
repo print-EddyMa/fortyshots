@@ -26,3 +26,7 @@
 start A5-P1-s0-202610302250
 {"run_id": "A5-P1-s0-202610302250", "hits": 1, "spent": 40, "duration_s": 3195.6, "aborted": false}
 start A5-P2-s0-202610302344
+
+[lab] a campaign finished; pushing it: pushed: 2 new or changed item(s) to branch runs-mac (99af416)
+{"run_id": "A5-P2-s0-202610302344", "hits": 2, "spent": 40, "duration_s": 2865.4, "aborted": false}
+start A5-P3-s0-202610310031
