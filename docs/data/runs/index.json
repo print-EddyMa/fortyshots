@@ -9,7 +9,8 @@
   "spent": 40,
   "duration_s": 2235.1,
   "started": "2026-10-31T03:18:58.051Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A4-P2-s0-202610310356",
@@ -21,7 +22,47 @@
   "spent": 40,
   "duration_s": 1954.1,
   "started": "2026-10-31T03:56:13.332Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
+ },
+ {
+  "run_id": "A4-P3-s0-202610310428",
+  "arm": "A4",
+  "pool": "P3",
+  "seed": 0,
+  "mode": "recorded",
+  "hits": 2,
+  "spent": 40,
+  "duration_s": 2563.3,
+  "started": "2026-10-31T04:28:47.631Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false
+ },
+ {
+  "run_id": "A4-P4-s0-202610310511",
+  "arm": "A4",
+  "pool": "P4",
+  "seed": 0,
+  "mode": "recorded",
+  "hits": 2,
+  "spent": 40,
+  "duration_s": 2595.7,
+  "started": "2026-10-31T05:11:31.173Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false
+ },
+ {
+  "run_id": "A4-P5-s0-202610310554",
+  "arm": "A4",
+  "pool": "P5",
+  "seed": 0,
+  "mode": "recorded",
+  "hits": 1,
+  "spent": 40,
+  "duration_s": 1501.6,
+  "started": "2026-10-31T05:54:47.187Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P0-s0-202610301238",
@@ -33,7 +74,8 @@
   "spent": 40,
   "duration_s": 5105.1,
   "started": "2026-10-30T12:38:54.288Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P0-s1-202610301403",
@@ -45,7 +87,8 @@
   "spent": 40,
   "duration_s": 6001.6,
   "started": "2026-10-30T14:03:59.850Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P0-s3-202610301718",
@@ -57,7 +100,8 @@
   "spent": 40,
   "duration_s": 4129.5,
   "started": "2026-10-30T17:18:32.439Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P0-s4-202610301827",
@@ -69,7 +113,8 @@
   "spent": 40,
   "duration_s": 3482.1,
   "started": "2026-10-30T18:27:22.283Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P0-s5-202610301925",
@@ -81,7 +126,8 @@
   "spent": 40,
   "duration_s": 3633.3,
   "started": "2026-10-30T19:25:24.702Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P1-s0-202610302250",
@@ -93,7 +139,8 @@
   "spent": 40,
   "duration_s": 3195.6,
   "started": "2026-10-30T22:50:46.854Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": true
  },
  {
   "run_id": "A5-P2-s0-202610302344",
@@ -105,7 +152,8 @@
   "spent": 40,
   "duration_s": 2865.4,
   "started": "2026-10-30T23:44:02.853Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P3-s0-202610310031",
@@ -117,7 +165,8 @@
   "spent": 40,
   "duration_s": 3114.1,
   "started": "2026-10-31T00:31:48.563Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P4-s0-202610310123",
@@ -129,7 +178,8 @@
   "spent": 40,
   "duration_s": 3973.4,
   "started": "2026-10-31T01:23:43.016Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P5-s0-202610310229",
@@ -141,7 +191,34 @@
   "spent": 40,
   "duration_s": 2940.9,
   "started": "2026-10-31T02:29:56.751Z",
-  "model": "muse-glimmer-30b"
+  "model": "muse-glimmer-30b",
+  "showcase": false
+ },
+ {
+  "run_id": "L-P1-s0-202610310619",
+  "arm": "L",
+  "pool": "P1",
+  "seed": 0,
+  "mode": "recorded",
+  "hits": 2,
+  "spent": 0,
+  "duration_s": 1603.7,
+  "started": "2026-10-31T06:19:49.003Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false
+ },
+ {
+  "run_id": "L2-P1-s0-202610310646",
+  "arm": "L2",
+  "pool": "P1",
+  "seed": 0,
+  "mode": "recorded",
+  "hits": 1,
+  "spent": 0,
+  "duration_s": 5669.7,
+  "started": "2026-10-31T06:46:32.825Z",
+  "model": "muse-glimmer-30b",
+  "showcase": false
  },
  {
   "run_id": "A5-P0-s2-202610301544",

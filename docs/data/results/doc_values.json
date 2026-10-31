@@ -1,0 +1,756 @@
+{
+ "results_generated": "2026-10-31T13:49:37Z",
+ "results_status": "pilot",
+ "head": "c43f1f77230175cce2c7965015c6e43e6f215a3d",
+ "ref": "origin/runs-mac",
+ "values": {
+  "A0_ENR": {
+   "value": "1.01×",
+   "source": "results.json arms[A0 random].enrichment (PREREG 6.2, per-pool ratio mean)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A0_HI": {
+   "value": "1.32",
+   "source": "results.json arms[A0 random].hits_ci[1]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A0_HITS": {
+   "value": "1.13",
+   "source": "results.json arms[A0 random].hits_mean",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A0_LO": {
+   "value": "0.95",
+   "source": "results.json arms[A0 random].hits_ci[0]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A0_LPH": {
+   "value": "35.3",
+   "source": "results.json arms[A0 random].lookups_per_hit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A0_N": {
+   "value": "250",
+   "source": "results.json arms[A0 random].n_runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A1_ENR": {
+   "value": "0.89×",
+   "source": "results.json arms[A1 heuristic].enrichment (PREREG 6.2, per-pool ratio mean)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A1_HI": {
+   "value": "2.20",
+   "source": "results.json arms[A1 heuristic].hits_ci[1]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A1_HITS": {
+   "value": "1.00",
+   "source": "results.json arms[A1 heuristic].hits_mean",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A1_LO": {
+   "value": "0.00",
+   "source": "results.json arms[A1 heuristic].hits_ci[0]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A1_LPH": {
+   "value": "40.0",
+   "source": "results.json arms[A1 heuristic].lookups_per_hit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A1_N": {
+   "value": "250",
+   "source": "results.json arms[A1 heuristic].n_runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A2_ENR": {
+   "value": "2.01×",
+   "source": "results.json arms[A2 MACE-greedy].enrichment (PREREG 6.2, per-pool ratio mean)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A2_HI": {
+   "value": "2.60",
+   "source": "results.json arms[A2 MACE-greedy].hits_ci[1]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A2_HITS": {
+   "value": "2.20",
+   "source": "results.json arms[A2 MACE-greedy].hits_mean",
+   "human": false,
+   "files": [
+    "README.md",
+    "VIDEO.md"
+   ]
+  },
+  "A2_LO": {
+   "value": "2.00",
+   "source": "results.json arms[A2 MACE-greedy].hits_ci[0]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A2_LPH": {
+   "value": "18.2",
+   "source": "results.json arms[A2 MACE-greedy].lookups_per_hit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A2_N": {
+   "value": "250",
+   "source": "results.json arms[A2 MACE-greedy].n_runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A3_ENR": {
+   "value": "1.25×",
+   "source": "results.json arms[A3 RF-UCB].enrichment (PREREG 6.2, per-pool ratio mean)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A3_HI": {
+   "value": "1.62",
+   "source": "results.json arms[A3 RF-UCB].hits_ci[1]",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "A3_HITS": {
+   "value": "1.39",
+   "source": "results.json arms[A3 RF-UCB].hits_mean",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "A3_LO": {
+   "value": "1.17",
+   "source": "results.json arms[A3 RF-UCB].hits_ci[0]",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "A3_LPH": {
+   "value": "28.8",
+   "source": "results.json arms[A3 RF-UCB].lookups_per_hit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A3_N": {
+   "value": "250",
+   "source": "results.json arms[A3 RF-UCB].n_runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A4_ENR": {
+   "value": "1.23×",
+   "source": "results.json arms[A4 zero-shot].enrichment (PREREG 6.2, per-pool ratio mean)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A4_HI": {
+   "value": "1.80",
+   "source": "results.json arms[A4 zero-shot].hits_ci[1]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A4_HITS": {
+   "value": "1.40",
+   "source": "results.json arms[A4 zero-shot].hits_mean",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A4_LO": {
+   "value": "1.00",
+   "source": "results.json arms[A4 zero-shot].hits_ci[0]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A4_LPH": {
+   "value": "28.6",
+   "source": "results.json arms[A4 zero-shot].lookups_per_hit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A4_N": {
+   "value": "5",
+   "source": "results.json arms[A4 zero-shot].n_runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_A2_DIFF": {
+   "value": "-0.80",
+   "source": "results.json tests[A5 - A2].diff",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_A2_P": {
+   "value": "1.000",
+   "source": "results.json tests[A5 - A2].p (one-sided)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_A3_DIFF": {
+   "value": "+0.01",
+   "source": "results.json tests[A5 - A3].diff",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_A3_P": {
+   "value": "0.527",
+   "source": "results.json tests[A5 - A3].p (one-sided)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_ENR": {
+   "value": "1.27×",
+   "source": "results.json arms[A5 agent].enrichment (PREREG 6.2, per-pool ratio mean)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_HI": {
+   "value": "1.80",
+   "source": "results.json arms[A5 agent].hits_ci[1]",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "A5_HITS": {
+   "value": "1.40",
+   "source": "results.json arms[A5 agent].hits_mean",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "A5_LO": {
+   "value": "1.00",
+   "source": "results.json arms[A5 agent].hits_ci[0]",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "A5_LPH": {
+   "value": "28.6",
+   "source": "results.json arms[A5 agent].lookups_per_hit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A5_N": {
+   "value": "5",
+   "source": "results.json arms[A5 agent].n_runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A6_ENR": {
+   "value": null,
+   "source": "results.json has no A6 arm (no analysed A6 runs)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A6_HI": {
+   "value": null,
+   "source": "results.json has no A6 arm (no analysed A6 runs)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A6_HITS": {
+   "value": null,
+   "source": "results.json has no A6 arm (no analysed A6 runs)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A6_LO": {
+   "value": null,
+   "source": "results.json has no A6 arm (no analysed A6 runs)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A6_LPH": {
+   "value": null,
+   "source": "results.json has no A6 arm (no analysed A6 runs)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "A6_N": {
+   "value": null,
+   "source": "results.json has no A6 arm (no analysed A6 runs)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "BRIER": {
+   "value": "0.087",
+   "source": "results.json calibration.brier",
+   "human": false,
+   "files": [
+    "README.md",
+    "VIDEO.md"
+   ]
+  },
+  "BRIER_N": {
+   "value": "200",
+   "source": "results.json calibration.n",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "CAMPAIGN_MIN": {
+   "value": "52",
+   "source": "median summary.duration_s / 60 over 5 recorded A5 runs (test-pool pools)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "CLAIMS_FLAGGED": {
+   "value": "17",
+   "source": "results.json claims.flagged",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "CLAIMS_N": {
+   "value": "241",
+   "source": "results.json claims.n",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "CLAIMS_VERIFIED": {
+   "value": "224",
+   "source": "results.json claims.verified",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "COVER_IMAGE_PATH": {
+   "value": null,
+   "source": "needs a human: the cover image chosen for the form (`npm run og` renders web/public/og.png from the showcase run; a person checks it)",
+   "human": true,
+   "files": [
+    "SUBMISSION.md"
+   ]
+  },
+  "CV_GALLERY_URL": {
+   "value": null,
+   "source": "needs a human: the Cerebral Valley gallery link, once published",
+   "human": true,
+   "files": [
+    "LAUNCH.md"
+   ]
+  },
+  "DFLASH_RESULT": {
+   "value": "3.0 → 6.8 tok/s with Meta's DFlash drafter, 68% of drafted tokens accepted",
+   "source": "doctor/20261029-214932-bench-small.json vs doctor/20261029-214932-bench-small-dflash.json: bench.cold.predicted_per_second, acceptance draft_n_accepted / draft_n (1685-token prompt) [UD-Q3_K_XL + vision]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "DFLASH_SENTENCE": {
+   "value": "Measured with `./lab bench` on this Mac, Meta's DFlash drafter takes UD-Q3_K_XL + vision decode from 3.0 to 6.8 tok/s, with 68% of drafted tokens accepted.",
+   "source": "doctor/20261029-214932-bench-small.json vs doctor/20261029-214932-bench-small-dflash.json: bench.cold.predicted_per_second, acceptance draft_n_accepted / draft_n (1685-token prompt)",
+   "human": false,
+   "files": [
+    "SUBMISSION.md"
+   ]
+  },
+  "DFT_INIT_AUC": {
+   "value": "0.65",
+   "source": "results.json honesty.dft_init_auc",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "EVENT_HASHTAG": {
+   "value": null,
+   "source": "needs a human: the event's official hashtag",
+   "human": true,
+   "files": [
+    "LAUNCH.md"
+   ]
+  },
+  "FINAL_SHA": {
+   "value": "c43f1f7",
+   "source": "git rev-parse --short=7 HEAD (the last commit before the docs are filled)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "H": {
+   "value": "1.40",
+   "source": "results.json arms[A5 agent].hits_mean",
+   "human": false,
+   "files": [
+    "LAUNCH.md",
+    "VIDEO.md"
+   ]
+  },
+  "HEADLINE": {
+   "value": "The Glimmer agent (A5) picked 1.40 hits in 40 lookups (95% CI 1.00–1.80) against 1.13 for random and 2.20 for the strongest baseline, greedy on the cheap simulator (MACE-greedy): it ties random, loses to MACE-greedy (difference -0.80, p = 1.000) and ties the random forest (RF-UCB, 1.39).",
+   "source": "PREREG 9 rule on results.json arms A5/A0/A2/A3 and tests A5 - A0/A2/A3",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "HEADLINE_SHORT": {
+   "value": "the agent picked 1.40 hits in 40 lookups (95% CI 1.00–1.80) vs 1.13 for random and 2.20 for MACE-greedy, so it ties random and loses to the strongest baseline",
+   "source": "results.json arms A5/A0/A2 and tests A5 - A0/A2",
+   "human": false,
+   "files": [
+    "SUBMISSION.md"
+   ]
+  },
+  "LEAK_AUC": {
+   "value": "0.65",
+   "source": "results.json leak.L_auc",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "LEAK_SENTENCE": {
+   "value": "that ranking the raw refcodes alone gives AUC 0.65, inside the range chance gives for 14 hits in 500 (0.35–0.65), so it gives no sign that the model recalls the answers",
+   "source": "results.json leak.L_auc vs the 95% chance band of an AUC for the probe pool's hits",
+   "human": false,
+   "files": []
+  },
+  "LLAMA_BUILD": {
+   "value": "b11960-8642541b2",
+   "source": "recorded run headers (17 runs): model.server_build / llama_build",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "MACE_AUC": {
+   "value": "0.49",
+   "source": "results.json honesty.mace_auc",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md"
+   ]
+  },
+  "MACE_AUC_HI": {
+   "value": "0.56",
+   "source": "results.json honesty.mace_auc_ci[1]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "MACE_AUC_LO": {
+   "value": "0.41",
+   "source": "results.json honesty.mace_auc_ci[0]",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "MACOS_VERSION": {
+   "value": "macOS 26.5.2",
+   "source": "recorded run headers (17 runs): machine.os",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "MEM_GB": {
+   "value": "22.3",
+   "source": "doctor/20261030-081419.json: machine.ram_gb × (1 − memory.free_pct_after / 100) after the doctor run on the default profile (system-wide, memory_pressure); no record report carries memory use",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "N_CHANGED": {
+   "value": "2",
+   "source": "A5 runs whose first ranking call (query_pool sort_by / fit_surrogate) after the first calibrate_oracle differs from the last one before it; 0 of 5 runs had no call on one side and count as unchanged",
+   "human": false,
+   "files": []
+  },
+  "N_COMMITS": {
+   "value": "63",
+   "source": "git rev-list --count hackathon-start..HEAD",
+   "human": false,
+   "files": [
+    "VIDEO.md"
+   ]
+  },
+  "ORACLE_HITS": {
+   "value": "14.00",
+   "source": "mean of results.json ceilings[].oracle_hits",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "PREFILL_TOKS": {
+   "value": "32",
+   "source": "median timings.prompt_per_second over 127 llm_call events with prompt_n >= 200 in 12 recorded runs (test-pool pools)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "PREREG_SHA": {
+   "value": "f5b216f38f4bd362fc93deb3f6a48d73e89a35fd7c40701e230299ba45c33638",
+   "source": "sha256 of PREREG.md at tag prereg-v1 (git show), the value run headers record as prereg_sha; results.json prereg_sha must be that tag's commit",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "RANDOM_HITS": {
+   "value": "1.12",
+   "source": "mean of results.json ceilings[].random_expected (40 × hits ÷ 500)",
+   "human": false,
+   "files": [
+    "README.md",
+    "LAUNCH.md",
+    "VIDEO.md"
+   ]
+  },
+  "REPO_URL": {
+   "value": "https://github.com/print-EddyMa/fortyshots",
+   "source": "web/site.config.json REPO_URL",
+   "human": false,
+   "files": [
+    "LAUNCH.md"
+   ]
+  },
+  "RESULTS_STATUS": {
+   "value": "pilot",
+   "source": "results.json status",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "RUNS_RANGE": {
+   "value": "d6b475d..c43f1f7",
+   "source": "first..last commit touching runs/ (git log -- runs/)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "SCHEMA_FAILURES": {
+   "value": "16",
+   "source": "error events where ['critic.review', 'director.schema', 'proposer.batch'] or invalid probe.scores, over the 12 analysed LLM runs",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "SITE_URL": {
+   "value": "https://print-eddyma.github.io/fortyshots/",
+   "source": "web/site.config.json SITE_URL",
+   "human": false,
+   "files": [
+    "LAUNCH.md"
+   ]
+  },
+  "SWAP_GB": {
+   "value": "3.6",
+   "source": "max memory.swap_max_growth_mb / 1024 over 3 record reports",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "TEAM_NAME": {
+   "value": null,
+   "source": "needs a human: the team name on the Cerebral Valley form",
+   "human": true,
+   "files": [
+    "SUBMISSION.md"
+   ]
+  },
+  "TOKS": {
+   "value": "6.3",
+   "source": "median timings.predicted_per_second over 135 llm_call events in 12 recorded runs (test-pool pools)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "VIDEO_URL": {
+   "value": null,
+   "source": "needs a human: the unlisted video link, after upload",
+   "human": true,
+   "files": [
+    "README.md",
+    "SUBMISSION.md"
+   ]
+  },
+  "VISUAL_RHO_MAE": {
+   "value": "0.24",
+   "source": "results.json critic.visual_rho_mae (vision critiques only)",
+   "human": false,
+   "files": [
+    "README.md"
+   ]
+  },
+  "VS_A2": {
+   "value": "loses",
+   "source": "results.json tests[A5 - A2 MACE-greedy]: beats if p < 0.05 and diff > 0, loses if CI < 0, else ties",
+   "human": false,
+   "files": []
+  },
+  "VS_RANDOM": {
+   "value": "ties",
+   "source": "results.json tests[A5 - A0 random]: beats if p < 0.05 and diff > 0, loses if CI < 0, else ties",
+   "human": false,
+   "files": []
+  },
+  "VS_RF": {
+   "value": "ties",
+   "source": "results.json tests[A5 - A3 RF-UCB]: beats if p < 0.05 and diff > 0, loses if CI < 0, else ties",
+   "human": false,
+   "files": []
+  },
+  "WHAT_IT_DID": {
+   "value": "checked the cheap simulator against its first 10 DFT labels (Spearman +0.42) and kept ranking by the cheap MACE score (S_mace)",
+   "source": "showcase run A5-P1-s0-202610302250 (PREREG 9 rule), trace around its first calibrate_oracle",
+   "human": false,
+   "files": [
+    "LAUNCH.md"
+   ]
+  },
+  "WHAT_IT_USED": {
+   "value": null,
+   "source": "not needed: showcase run A5-P1-s0-202610302250 kept the cheap MACE score (S_mace) after the check, so VIDEO.md uses narration variant B",
+   "human": false,
+   "files": [
+    "VIDEO.md"
+   ]
+  },
+  "WIN_TIE_LOSS_SENTENCE": {
+   "value": "It ties the random forest and loses to MACE-greedy (2.20), the strongest baseline.",
+   "source": "results.json tests A5 - A3 and A5 - A2, arms A2",
+   "human": false,
+   "files": [
+    "LAUNCH.md",
+    "VIDEO.md"
+   ]
+  },
+  "X_THREAD_URL": {
+   "value": null,
+   "source": "needs a human: the X thread link, after posting",
+   "human": true,
+   "files": [
+    "SUBMISSION.md"
+   ]
+  }
+ }
+}
