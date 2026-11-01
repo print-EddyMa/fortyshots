@@ -1,0 +1,236 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>humidity: why humidity breaks carbon capture</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="data.js"></script>
+<script src="scene.js"></script>
+</head>
+<body>
+<script>
+// Why humidity breaks carbon capture. A stylised pore with one open metal site. Phase A (most materials):
+// CO2 and H2O drift in, water reaches the site first and stays; CO2 bounces off. Phase B (a good material, the
+// landing hero): CO2 takes the site and water cannot displace it. Bars: |E_ads| from DFT (ODAC23), no numbers.
+// Geometry: CO2 linear (O=C=O, C-O 1.16 A); H2O bent (H-O-H 104.5 deg, O-H 0.96 A); 50 px per A.
+const { el, set, text, headline, C, clamp, lerp, ease, tw, win, hash } = Scene;
+const PX_PER_A = 50;
+const CO = 1.16 * PX_PER_A;
+const OH = 0.96 * PX_PER_A;
+const HOH = (104.5 * Math.PI) / 180;
+const R = { O: 22, C: 17, H: 12 };
+
+function co2(parent) {
+  const g = el('g', {}, parent);
+  for (const s of [-6, 6]) el('line', { x1: -CO, y1: s, x2: CO, y2: s, stroke: C.muted, 'stroke-width': 4, 'stroke-linecap': 'round' }, g);
+  el('circle', { cx: -CO, cy: 0, r: R.O, fill: C.accent }, g);
+  el('circle', { cx: CO, cy: 0, r: R.O, fill: C.accent }, g);
+  el('circle', { cx: 0, cy: 0, r: R.C, fill: C.fg }, g);
+  return g;
+}
+// local frame: O at the origin, the two H below it (+y), 104.5 deg apart
+function h2o(parent) {
+  const g = el('g', {}, parent);
+  const hx = OH * Math.sin(HOH / 2);
+  const hy = OH * Math.cos(HOH / 2);
+  for (const sx of [-1, 1]) {
+    el('line', { x1: 0, y1: 0, x2: sx * hx, y2: hy, stroke: C.muted, 'stroke-width': 4, 'stroke-linecap': 'round' }, g);
+  }
+  for (const sx of [-1, 1]) el('circle', { cx: sx * hx, cy: hy, r: R.H, fill: '#d4d4d4' }, g);
+  el('circle', { cx: 0, cy: 0, r: R.O, fill: C.muted }, g);
+  return g;
+}
+function place(g, x, y, rot, op = 1) {
+  set(g, { transform: `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${rot.toFixed(2)})`, opacity: op.toFixed(3) });
+}
+
+Scene.run({
+  duration: 10,
+  build(ctx) {
+    const { svg, W, H, portrait, data } = ctx;
+    const D = data.humidity;
+    const L = portrait
+      ? { hx: 80, hy: 250, hs: 66, x0: 40, x1: 1040, top: 540, bot: 1020, mx: 540, panelX: 80, numY: 1270, numS: 190, lab1: 1330, lab2: 1374, barX: 590, barY: 1170, barW: 380, legX: 80, legendY: 420 }
+      : { hx: 120, hy: 150, hs: 62, x0: 100, x1: 1240, top: 300, bot: 820, mx: 670, panelX: 1350, numY: 540, numS: 240, lab1: 612, lab2: 658, barX: 1350, barY: 740, barW: 430, legX: 1350, legendY: 140 };
+    ctx.L = L;
+    // headlines (crossfaded)
+    ctx.hA = headline(svg, [[['The catch is humidity.', false]], [['Water grabs the site first.', true]]], L.hx, L.hy, L.hs);
+    ctx.hB = headline(svg, [[['The rare good ones:', false]], [['CO₂ holds on.', true]]], L.hx, L.hy, L.hs);
+
+    // pore walls: two rows of linker rings with metal nodes, hairline strokes
+    const walls = el('g', {}, svg);
+    ctx.walls = walls;
+    const ring = (cx, cy, r) => {
+      const pts = [];
+      for (let k = 0; k < 6; k++) {
+        const a = (Math.PI / 3) * k + Math.PI / 6;
+        pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+      }
+      el('polygon', { points: pts.join(' '), fill: 'none', stroke: C.ruleStrong, 'stroke-width': 2.5 }, walls);
+    };
+    const step = 120;
+    for (const [y, dir] of [[L.top, -1], [L.bot, 1]]) {
+      el('line', { x1: L.x0, y1: y, x2: L.x1, y2: y, stroke: C.ruleStrong, 'stroke-width': 2.5 }, walls);
+      for (let x = L.mx - step * 10; x <= L.x1 + step; x += step) {
+        if (x < L.x0 - 20 || x > L.x1 + 20) continue;
+        const isMetal = dir === 1 && Math.abs(x - L.mx) < 1;
+        if (isMetal) continue;
+        ring(x, y + dir * 34, 26);
+        el('line', { x1: x, y1: y, x2: x, y2: y + dir * 8, stroke: C.ruleStrong, 'stroke-width': 2.5 }, walls);
+      }
+    }
+    // the open metal site
+    const site = el('g', {}, svg);
+    ctx.site = site;
+    el('rect', { x: L.mx - 21, y: L.bot - 21, width: 42, height: 42, transform: `rotate(45 ${L.mx} ${L.bot})`, fill: C.sunken, stroke: C.fg, 'stroke-width': 2.5 }, site);
+    ctx.siteLabel = text(site, 'metal site', L.mx, L.bot + 64, 22, { mono: true, fill: C.muted, anchor: 'middle' });
+    ctx.ring = el('circle', { cx: L.mx, cy: L.bot - 80, r: 74, fill: 'none', stroke: C.muted, 'stroke-width': 1.5, 'stroke-dasharray': '4 7' }, svg);
+    ctx.tag = text(svg, '', L.mx + 100, L.bot - 30, 26, { mono: true, fill: C.muted });
+
+    // legend
+    const lg = el('g', {}, svg);
+    ctx.legend = lg;
+    const lc = co2(lg);
+    set(lg, { transform: `translate(${L.legX} ${L.legendY}) scale(0.8)` });
+    place(lc, 64, 0, 0);
+    text(lg, 'CO₂', 162, 11, 32, { mono: true, fill: C.fg });
+    const lw = h2o(lg);
+    place(lw, 330, -12, 0);
+    text(lg, 'H₂O', 380, 11, 32, { mono: true, fill: C.fg });
+
+    // molecules
+    ctx.mol = {};
+    const mk = (id, kind) => (ctx.mol[id] = kind === 'c' ? co2(svg) : h2o(svg));
+    ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10', 'w11'].forEach((id) => mk(id, 'w'));
+    ['c1', 'c2', 'c3', 'c4'].forEach((id) => mk(id, 'c'));
+
+    // panel A: the one number
+    const pA = el('g', {}, svg);
+    ctx.pA = pA;
+    ctx.num = text(pA, '0%', L.panelX - 8, L.numY, L.numS, { fill: C.fg });
+    text(pA, `of ${D.n.toLocaleString('en-US')} candidates:`, L.panelX, L.lab1, 34, { fill: C.faint });
+    text(pA, 'water wins the site', L.panelX, L.lab2, 34, { fill: C.fg });
+    // panel B
+    const pB = el('g', {}, svg);
+    ctx.pB = pB;
+    const bTop = portrait ? L.numY - 110 : L.numY - 150;
+    headline(pB, [[['fortyshots hunts for', false]], [['the few where', true]], [['CO₂ wins.', true]]], L.panelX, bTop, portrait ? 50 : 54, 1.12);
+
+    // grip bars (|E_ads| from DFT), shared by both phases
+    const bars = el('g', {}, svg);
+    ctx.bars = bars;
+    const by = L.barY;
+    ctx.barC = el('rect', { x: L.barX + 92, y: by, width: 0, height: 16, fill: C.accent }, bars);
+    ctx.barW = el('rect', { x: L.barX + 92, y: by + 38, width: 0, height: 16, fill: C.muted }, bars);
+    text(bars, 'CO₂', L.barX, by + 15, 22, { mono: true, fill: C.fg });
+    text(bars, 'H₂O', L.barX, by + 53, 22, { mono: true, fill: C.fg });
+    ctx.barCap = text(bars, '', L.barX, by + 100, 27, { mono: true, fill: C.muted });
+    ctx.barSrc = text(bars, '', L.barX, by + 134, 20, { mono: true, fill: C.faint });
+    ctx.D = D;
+  },
+  update(t, ctx) {
+    const { L, mol, D } = ctx;
+    // phase A holds the 85% while the narration says it; phase B is short
+    const A_END = 6.1;
+    const B0 = 6.4;
+    set(ctx.hA, { opacity: win(t, 0.05, A_END + 0.2, 0.4) });
+    set(ctx.hB, { opacity: win(t, B0 - 0.1) });
+    set(ctx.walls, { opacity: tw(t, 0, 0.6, ease.out) });
+    set(ctx.site, { opacity: tw(t, 0.1, 0.7, ease.out) });
+    set(ctx.legend, { opacity: win(t, 0.3) });
+
+    // geometry helpers
+    const yIn0 = L.top + 70;
+    const yIn1 = L.bot - 130;
+    const xr = L.x1 - 10; // enter inside the pore and fade in, so nothing crosses the text panel
+    const xl = L.x0 + 10;
+    const dockW = { x: L.mx, y: L.bot - 21 - R.O - 8 }; // water O above the node, H up
+    const tilt = 28;
+    const oc = L.bot - 21 - R.O - 8;
+    const dockC = { x: L.mx + CO * Math.sin((tilt * Math.PI) / 180), y: oc - CO * Math.cos((tilt * Math.PI) / 180), rot: 90 + tilt };
+    const drift = (i, t0, dur, v, phaseOp) => {
+      const k = (t - t0) / dur;
+      const x = lerp(xr, xl, k);
+      const y = lerp(yIn0, yIn1, v) + 18 * Math.sin(2.1 * t + i * 1.7);
+      const rot = 40 * Math.sin(0.9 * t + i) + i * 50;
+      const op = clamp(k / 0.08) * clamp((1 - k) / 0.08) * phaseOp;
+      return [x, y, rot, op];
+    };
+    const opA = 1 - tw(t, A_END - 0.3, A_END + 0.2);
+    const opB = tw(t, B0 - 0.2, B0 + 0.3);
+
+    // --- phase A
+    // w1 docks: comes in from the right, swings down onto the site, stays
+    {
+      const k = tw(t, 0.4, 2.0, ease.out);
+      const x = lerp(xr, dockW.x, k);
+      const y = lerp(yIn0 + 40, dockW.y, tw(t, 1.0, 2.0, ease.inOut)) + (1 - k) * 14 * Math.sin(3 * t);
+      const rot = lerp(-130, 180, k) + (k >= 1 ? 3 * Math.sin(4 * t) : 0);
+      place(mol.w1, x, y, rot, tw(t, 0.4, 0.7) * opA);
+    }
+    // c1 arrives just after, finds the site taken, bounces back up and away
+    {
+      const kin = tw(t, 1.1, 2.6, ease.out);
+      const kout = tw(t, 2.6, 4.0, ease.inOut);
+      const x = lerp(lerp(xr, L.mx + 150, kin), L.mx + 470, kout);
+      const y = lerp(lerp(yIn0, L.bot - 150, kin), yIn0 - 20, kout);
+      const rot = lerp(lerp(10, 70, kin), 200, kout);
+      place(mol.c1, x, y, rot, tw(t, 1.1, 1.4) * opA * (1 - tw(t, 3.5, 4.0)));
+    }
+    place(mol.w2, ...drift(2, 0.2, 5.5, 0.15, opA));
+    place(mol.w3, ...drift(3, 1.0, 5.2, 0.55, opA));
+    place(mol.w4, ...drift(4, 2.2, 4.8, 0.3, opA));
+    place(mol.c2, ...drift(5, 0.0, 6.0, 0.4, opA));
+    place(mol.w8, ...drift(9, 3.0, 5.0, 0.75, opA));
+    place(mol.w9, ...drift(10, 1.6, 5.4, 0.05, opA));
+    place(mol.w10, ...drift(11, 0.6, 4.6, 0.95, opA));
+
+    // --- phase B (the hero)
+    {
+      const k = tw(t, B0, B0 + 1.1, ease.out);
+      const x = lerp(xr, dockC.x, k);
+      const y = lerp(yIn0 + 30, dockC.y, tw(t, B0 + 0.4, B0 + 1.1, ease.inOut)) + (1 - k) * 12 * Math.sin(3 * t);
+      const rot = lerp(-40, dockC.rot, k) + (k >= 1 ? 2 * Math.sin(4 * t) : 0);
+      place(mol.c3, x, y, rot, tw(t, B0, B0 + 0.3) * opB);
+    }
+    // w5 tries for the site, is turned away
+    {
+      const kin = tw(t, B0 + 0.5, B0 + 1.5, ease.out);
+      const kout = tw(t, B0 + 1.5, B0 + 2.8, ease.inOut);
+      const x = lerp(lerp(xr, L.mx + 140, kin), L.mx - 360, kout);
+      const y = lerp(lerp(yIn0 + 10, L.bot - 170, kin), yIn0 + 20, kout);
+      const rot = lerp(lerp(160, 60, kin), -90, kout);
+      place(mol.w5, x, y, rot, tw(t, B0 + 0.5, B0 + 0.8) * opB * (1 - tw(t, B0 + 2.4, B0 + 2.8)));
+    }
+    place(mol.w6, ...drift(6, B0 - 0.2, 5.0, 0.2, opB));
+    place(mol.w7, ...drift(7, B0 + 1.6, 4.6, 0.5, opB));
+    place(mol.c4, ...drift(8, B0 + 0.6, 5.4, 0.1, opB));
+    place(mol.w11, ...drift(12, B0 + 0.1, 5.2, 0.85, opB));
+
+    // site ring and tag
+    const docked = (t > 2.0 && t < A_END) || t > B0 + 1.1;
+    set(ctx.ring, { opacity: (docked ? 0.25 : 0.8) * tw(t, 0.4, 0.9) * (t > A_END - 0.2 && t < B0 ? 0.3 : 1) });
+    const tagA = win(t, 2.1, A_END, 0.3);
+    const tagB = win(t, B0 + 1.1);
+    set(ctx.tag, { text: t < B0 ? 'H₂O bound' : 'CO₂ bound', fill: t < B0 ? C.muted : C.accent, opacity: Math.max(tagA, tagB) });
+
+    // panel A: count to the share where water wins
+    const kn = tw(t, 2.0, 3.0, ease.out);
+    set(ctx.num, { text: `${Math.round(D.water_pct * kn)}%` });
+    set(ctx.pA, { opacity: win(t, 1.9, A_END, 0.4) });
+    set(ctx.pB, { opacity: win(t, B0 + 0.5) });
+
+    // grip bars: the typical water-wins material, then the hero
+    const scale = L.barW / Math.max(Math.abs(D.hero.E_CO2), Math.abs(D.water_example.E_H2O), Math.abs(D.water_example.E_CO2));
+    const ex = t < B0 ? D.water_example : D.hero;
+    const gk = t < B0 ? tw(t, 3.0, 3.6, ease.out) : tw(t, B0 + 0.9, B0 + 1.5, ease.out);
+    set(ctx.barC, { width: (Math.abs(ex.E_CO2) * scale * gk).toFixed(1) });
+    set(ctx.barW, { width: (Math.abs(ex.E_H2O) * scale * gk).toFixed(1) });
+    set(ctx.barCap, { text: t < B0 ? 'water holds tighter' : 'CO₂ holds tighter than water', fill: t < B0 ? C.muted : C.fg });
+    set(ctx.barSrc, { text: `binding strength, DFT (ODAC23) · ${ex.id}` });
+    set(ctx.bars, { opacity: t < B0 ? win(t, 2.9, A_END, 0.4) : win(t, B0 + 0.8) });
+  },
+});
+</script>
+</body>
+</html>

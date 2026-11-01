@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>split: the AI decides what to test, physics decides what's true</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="data.js"></script>
+<script src="scene.js"></script>
+</head>
+<body>
+<script>
+// The principle card. Left: the model (a small network glyph), right: physics (an atom). Picks travel from the
+// model to physics; verdicts come back. Two lines of type. No numbers. Laid out for 1920x1080; in a portrait
+// window the same drawing is scaled to fit.
+const { el, set, text, C, clamp, lerp, ease, tw, win } = Scene;
+
+Scene.run({
+  duration: 8,
+  build(ctx) {
+    const { svg, W, H, portrait } = ctx;
+    const root = el('g', {}, svg);
+    if (portrait) set(root, { transform: `translate(0 ${(H - 1080 * (W / 1920)) / 2}) scale(${W / 1920})` });
+    const AX = 640;
+    const PX = 1280;
+    const IY = 330;
+    ctx.geo = { AX, PX, IY };
+
+    // the model: a three-layer network glyph
+    const ai = el('g', {}, root);
+    ctx.ai = ai;
+    const layers = [[-70, [-50, 0, 50]], [0, [-75, -25, 25, 75]], [70, [-50, 0, 50]]];
+    const nodes = layers.map(([x, ys]) => ys.map((y) => [AX + x, IY + y]));
+    ctx.edges = [];
+    for (let l = 0; l < 2; l++) for (const a of nodes[l]) for (const b of nodes[l + 1]) ctx.edges.push(el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: C.ruleStrong, 'stroke-width': 2 }, ai));
+    ctx.aiNodes = nodes.flat().map(([x, y]) => el('circle', { cx: x, cy: y, r: 10, fill: C.bg, stroke: C.fg, 'stroke-width': 2.5 }, ai));
+    text(ai, 'the AI', AX, IY + 160, 30, { anchor: 'middle' });
+    text(ai, 'Muse Glimmer 30B', AX, IY + 196, 22, { mono: true, fill: C.muted, anchor: 'middle' });
+
+    // physics: an atom with three orbits
+    const ph = el('g', {}, root);
+    ctx.ph = ph;
+    el('circle', { cx: PX, cy: IY, r: 13, fill: C.accent }, ph);
+    ctx.orbits = [0, 60, 120].map((rot) => {
+      const g = el('g', { transform: `rotate(${rot} ${PX} ${IY})` }, ph);
+      el('ellipse', { cx: PX, cy: IY, rx: 100, ry: 34, fill: 'none', stroke: C.fg, 'stroke-width': 2.5 }, g);
+      const e = el('circle', { r: 8, fill: C.fg }, g);
+      return { g, e, rot };
+    });
+    text(ph, 'physics', PX, IY + 160, 30, { anchor: 'middle' });
+    text(ph, 'quantum chemistry (DFT)', PX, IY + 196, 22, { mono: true, fill: C.muted, anchor: 'middle' });
+
+    // arrows between them
+    const ar = el('g', {}, root);
+    ctx.arrows = ar;
+    const x0 = AX + 130;
+    const x1 = PX - 140;
+    ctx.ax = [x0, x1];
+    el('line', { x1: x0, y1: IY - 34, x2: x1, y2: IY - 34, stroke: C.muted, 'stroke-width': 2 }, ar);
+    el('path', { d: `M ${x1 - 12} ${IY - 44} L ${x1} ${IY - 34} L ${x1 - 12} ${IY - 24}`, fill: 'none', stroke: C.muted, 'stroke-width': 2, 'stroke-linejoin': 'round' }, ar);
+    el('line', { x1: x0, y1: IY + 34, x2: x1, y2: IY + 34, stroke: C.muted, 'stroke-width': 2 }, ar);
+    el('path', { d: `M ${x0 + 12} ${IY + 24} L ${x0} ${IY + 34} L ${x0 + 12} ${IY + 44}`, fill: 'none', stroke: C.muted, 'stroke-width': 2, 'stroke-linejoin': 'round' }, ar);
+    text(ar, 'what to test', (x0 + x1) / 2, IY - 58, 22, { mono: true, fill: C.muted, anchor: 'middle' });
+    text(ar, "what's true", (x0 + x1) / 2, IY + 82, 22, { mono: true, fill: C.muted, anchor: 'middle' });
+    // travellers: three picks out, a check back
+    ctx.picks = [0, 1, 2].map(() => el('circle', { r: 8, fill: C.fg }, root));
+    ctx.check = el('path', { d: 'M -12 0 L -4 9 L 13 -10', fill: 'none', stroke: C.accent, 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, root);
+
+    // the two lines
+    ctx.l1 = text(root, 'The AI decides what to test.', 960, 700, 92, { anchor: 'middle' });
+    ctx.l2 = text(root, "Physics decides what's true.", 960, 812, 92, { anchor: 'middle', fill: C.accent });
+  },
+  update(t, ctx) {
+    const { AX, PX, IY } = ctx.geo;
+    const [x0, x1] = ctx.ax;
+    const a1 = tw(t, 0.0, 0.6, ease.back);
+    set(ctx.ai, { opacity: tw(t, 0, 0.4), transform: `translate(${AX} ${IY}) scale(${0.7 + 0.3 * a1}) translate(${-AX} ${-IY})` });
+    const a2 = tw(t, 0.15, 0.75, ease.back);
+    set(ctx.ph, { opacity: tw(t, 0.15, 0.55), transform: `translate(${PX} ${IY}) scale(${0.7 + 0.3 * a2}) translate(${-PX} ${-IY})` });
+    set(ctx.arrows, { opacity: tw(t, 0.5, 1.0) });
+    // network: a wave of activity before each send
+    const cyc = 3.2;
+    const c = Math.max(0, t - 0.9) % cyc;
+    ctx.aiNodes.forEach((n, i) => {
+      const col = i < 3 ? 0 : i < 7 ? 1 : 2;
+      const on = t > 0.9 && c < 1.0 && Math.abs(c * 3 - col) < 0.6;
+      set(n, { fill: on ? C.fg : C.bg });
+    });
+    // electrons
+    const speed = t > 0.9 && c > 1.4 && c < 2.2 ? 3.2 : 1.1;
+    ctx.orbits.forEach((o, i) => {
+      const ph = t * 2.2 * 1.1 + i * 2.1 + (t > 0.9 ? Math.floor((t - 0.9) / cyc) * 0.0 : 0);
+      const ang = ph + (speed > 2 ? (c - 1.4) * 4 : 0);
+      set(o.e, { cx: PX + 100 * Math.cos(ang), cy: IY + 34 * Math.sin(ang) });
+    });
+    // picks fly to physics
+    ctx.picks.forEach((p, j) => {
+      const k = t > 0.9 ? tw(c, 0.6 + j * 0.12, 1.4 + j * 0.12, ease.inOut) : 0;
+      const vis = t > 0.9 && k > 0 && k < 1;
+      set(p, { cx: lerp(x0, x1, k), cy: IY - 34, opacity: vis ? 1 : 0 });
+    });
+    // a verdict comes back
+    const kb = t > 0.9 ? tw(c, 2.0, 2.8, ease.inOut) : 0;
+    set(ctx.check, { transform: `translate(${lerp(x1, x0, kb)} ${IY + 34})`, opacity: t > 0.9 && kb > 0 && kb < 1 ? 1 : 0 });
+    // type
+    const k1 = tw(t, 0.6, 1.3, ease.out);
+    set(ctx.l1, { opacity: k1, transform: `translate(0 ${(1 - k1) * 24})` });
+    const k2 = tw(t, 1.9, 2.6, ease.out);
+    set(ctx.l2, { opacity: k2, transform: `translate(0 ${(1 - k2) * 24})` });
+  },
+});
+</script>
+</body>
+</html>

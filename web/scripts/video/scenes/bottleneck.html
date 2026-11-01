@@ -1,0 +1,197 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>bottleneck: 3,000 → 500 → 40</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="data.js"></script>
+<script src="scene.js"></script>
+</head>
+<body>
+<script>
+// The bottleneck. The 3,000 MOFs at their atlas positions (results/atlas.json, t-SNE of label-free descriptors)
+// collapse to one search of 500 (the showcase run's pool); the 40 affordable tests light up round by round (the
+// showcase run's real picks); the results reveal its hit; then the pool's other hidden hits show as rings.
+const { el, set, text, headline, C, clamp, lerp, ease, tw, win, hash } = Scene;
+
+const SPEED = 1.35;
+
+Scene.run({
+  // the timeline below is written in 'story seconds'; SPEED plays it a little faster
+  duration: 10.5 / SPEED,
+  build(ctx) {
+    const { svg, W, H, portrait, data } = ctx;
+    const D = data.bottleneck;
+    const L = portrait
+      ? { hx: 80, hy: 220, hs: 62, F: { x: 70, y: 700, w: 940, h: 680 }, cols: 25, numX: 72, numY: 545, numS: 170, labX: 80, labY: 612 }
+      : { hx: 120, hy: 150, hs: 62, F: { x: 900, y: 175, w: 900, h: 690 }, cols: 25, numX: 112, numY: 640, numS: 280, labX: 120, labY: 715 };
+    ctx.L = L;
+    const lines = portrait
+      ? [[['Each test: hours of', false]], [['supercomputer time.', false]], [['Which 40 do you check?', true]]]
+      : [[['Each test: hours of', false]], [['supercomputer time.', false]], [['Which 40 do you check?', true]]];
+    ctx.head = headline(svg, lines, L.hx, L.hy, L.hs);
+
+    // canvas under the svg for the dots
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    cv.style.cssText = 'position:absolute;left:0;top:0';
+    document.body.insertBefore(cv, svg);
+    ctx.g = cv.getContext('2d');
+
+    // positions
+    const F = L.F;
+    const n = D.x.length;
+    const pool = [];
+    for (let i = 0; i < n; i++) if (D.in_pool[i]) pool.push(i);
+    pool.sort((a, b) => (D.ids[a] < D.ids[b] ? -1 : 1));
+    const rows = Math.ceil(pool.length / L.cols);
+    const cell = Math.min(F.w / L.cols, F.h / rows);
+    const gx0 = F.x + (F.w - cell * L.cols) / 2 + cell / 2;
+    const gy0 = F.y + (F.h - cell * rows) / 2 + cell / 2;
+    const grid = new Map();
+    pool.forEach((i, k) => grid.set(i, [gx0 + (k % L.cols) * cell, gy0 + Math.floor(k / L.cols) * cell]));
+    const pickRound = new Map();
+    const pickOrder = new Map();
+    D.picks_by_round.forEach((ids, r) => ids.forEach((id, j) => {
+      pickRound.set(id, r);
+      pickOrder.set(id, j);
+    }));
+    const found = new Set(D.found);
+    ctx.P = { n, pool, grid, cell, pickRound, pickOrder, found, F };
+
+    // big number + label
+    ctx.nums = ['3,000', String(D.pool_n), String(D.budget)].map((s) => text(svg, s, L.numX, L.numY, L.numS, { fill: C.fg }));
+    const labs = [['candidate materials', ''], ['in one search', ''], ['tests you can afford', '']];
+    ctx.labs = labs.map(([a, b]) => {
+      const g = el('g', {}, svg);
+      text(g, a, L.labX, L.labY, 40, { fill: C.faint });
+      if (b) text(g, b, L.labX, L.labY + 48, 40, { fill: C.faint });
+      return g;
+    });
+    // clock icon + "hours each"
+    const ck = el('g', {}, svg);
+    ctx.clock = ck;
+    const cx = portrait ? L.labX + 22 : L.labX + 22;
+    const cy = portrait ? F.y + F.h + 52 : L.labY + 70;
+    el('circle', { cx, cy, r: 18, fill: 'none', stroke: C.fg, 'stroke-width': 2.5 }, ck);
+    ctx.hand = el('line', { x1: cx, y1: cy, x2: cx, y2: cy - 12, stroke: C.accent, 'stroke-width': 3, 'stroke-linecap': 'round' }, ck);
+    text(ck, 'hours of supercomputer time each', cx + 34, cy + 9, 26, { mono: true, fill: C.muted });
+    ctx.clockC = [cx, cy];
+    // legend for the reveal
+    const lg = el('g', {}, svg);
+    ctx.legend = lg;
+    const ly = F.y - 26;
+    el('circle', { cx: F.x + 12, cy: ly - 8, r: 9, fill: C.accent }, lg);
+    text(lg, 'good material found', F.x + 32, ly, 24, { mono: true, fill: C.fg });
+    el('circle', { cx: F.x + (portrait ? 390 : 380), cy: ly - 8, r: 8, fill: 'none', stroke: C.accent, 'stroke-width': 2.5 }, lg);
+    text(lg, 'hidden, never tested', F.x + (portrait ? 410 : 400), ly, 24, { mono: true, fill: C.muted });
+    ctx.D = D;
+  },
+  update(t, ctx) {
+    t *= SPEED;
+    const { g, P, D, L, W, H } = ctx;
+    const F = P.F;
+    set(ctx.head, { opacity: win(t, 0.0, Infinity, 0.5) });
+    // number stages
+    const st = t < 1.9 ? 0 : t < 3.4 ? 1 : 2;
+    ctx.nums.forEach((e, i) => set(e, { opacity: i === st ? tw(t, [0.2, 1.9, 3.4][i], [0.2, 1.9, 3.4][i] + 0.35, ease.out) : 0 }));
+    ctx.labs.forEach((e, i) => set(e, { opacity: i === st ? tw(t, [0.3, 2.0, 3.5][i], [0.3, 2.0, 3.5][i] + 0.35, ease.out) : 0 }));
+    set(ctx.clock, { opacity: win(t, 3.7) });
+    const [cx, cy] = ctx.clockC;
+    const ang = Math.max(0, t - 3.7) * 2 * Math.PI * 0.9;
+    set(ctx.hand, { x2: cx + 12 * Math.sin(ang), y2: cy - 12 * Math.cos(ang) });
+    set(ctx.legend, { opacity: win(t, 7.6) });
+
+    g.clearRect(0, 0, W, H);
+    const kCollapse = (i) => tw(t, 1.5 + hash(i) * 0.6, 2.9 + hash(i) * 0.6, ease.inOut);
+    const ROUND0 = 3.6;
+    const RSTEP = 0.75;
+    const REVEAL = 6.9;
+    for (let i = 0; i < P.n; i++) {
+      const ax = F.x + D.x[i] * F.w;
+      const ay = F.y + (1 - D.y[i]) * F.h;
+      const appear = tw(t, 0.05 + D.x[i] * 0.6, 0.45 + D.x[i] * 0.6, ease.out);
+      const inPool = D.in_pool[i];
+      if (!inPool) {
+        const a = appear * lerp(0.55, 0.07, tw(t, 1.4, 2.3));
+        if (a <= 0.005) continue;
+        g.globalAlpha = a;
+        g.fillStyle = C.muted;
+        g.beginPath();
+        g.arc(ax, ay, 2.6, 0, Math.PI * 2);
+        g.fill();
+        continue;
+      }
+      const [gx, gy] = P.grid.get(i);
+      const k = kCollapse(i);
+      const x = lerp(ax, gx, k);
+      const y = lerp(ay, gy, k);
+      const r = lerp(2.6, P.cell * 0.27, k);
+      const id = D.ids[i];
+      let fill = C.muted;
+      let alpha = appear * lerp(0.55, 0.5, k);
+      let ring = 0;
+      if (P.pickRound.has(id)) {
+        const tp = ROUND0 + P.pickRound.get(id) * RSTEP + P.pickOrder.get(id) * 0.045;
+        const lit = tw(t, tp, tp + 0.18, ease.out);
+        if (lit > 0) {
+          fill = C.fg;
+          alpha = lerp(alpha, 1, lit);
+          ring = lit * (1 - tw(t, tp + 0.2, tp + 0.6));
+        }
+        const rv = tw(t, REVEAL + P.pickOrder.get(id) * 0.02 + P.pickRound.get(id) * 0.05, REVEAL + 0.3 + P.pickRound.get(id) * 0.05, ease.out);
+        if (rv > 0) {
+          if (P.found.has(id)) {
+            fill = C.accent;
+            alpha = 1;
+          } else {
+            fill = rv > 0.5 ? '#3a3a3a' : C.fg;
+            alpha = 1;
+          }
+        }
+        if (P.found.has(id) && t > REVEAL) {
+          // pulse ring for the hit
+          const pk = ((t - REVEAL - 0.3) % 1.2) / 1.2;
+          if (t > REVEAL + 0.3) {
+            g.globalAlpha = 0.9 * (1 - pk);
+            g.strokeStyle = C.accent;
+            g.lineWidth = 3;
+            g.beginPath();
+            g.arc(x, y, r + 6 + pk * 34, 0, Math.PI * 2);
+            g.stroke();
+          }
+        }
+        if (ring > 0) {
+          g.globalAlpha = ring;
+          g.strokeStyle = C.fg;
+          g.lineWidth = 2;
+          g.beginPath();
+          g.arc(x, y, r + 4 + 10 * (1 - ring), 0, Math.PI * 2);
+          g.stroke();
+        }
+      } else if (D.hit[i]) {
+        // hidden good materials: shown as rings after the reveal
+        const hv = tw(t, 7.7 + hash(i + 7) * 0.6, 8.1 + hash(i + 7) * 0.6, ease.out);
+        if (hv > 0) {
+          g.globalAlpha = hv;
+          g.strokeStyle = C.accent;
+          g.lineWidth = 3;
+          g.beginPath();
+          g.arc(x, y, r + 1, 0, Math.PI * 2);
+          g.stroke();
+          alpha *= 1 - hv;
+        }
+      }
+      g.globalAlpha = alpha;
+      g.fillStyle = fill;
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+  },
+});
+</script>
+</body>
+</html>

@@ -33,10 +33,10 @@ Then quote-post Meta's Muse Glimmer announcement with post 1, if you can find it
 | Time | Picture | Caption |
 |---|---|---|
 | 0–4 s | Hook orbit: the landing hero, a real DFT hit as a 2×2×2 supercell, CO2 settling into its pore | "One open Meta model on a laptop picks which 40 DFT experiments to run." |
-| 4–10 s | The 85% scatter (Results, Why this is hard): 3,000 MOFs, water against CO2 | "In 85% of 3,000 MOFs, water takes the binding site first." |
+| 4–10 s | Scene `humidity`: water reaches the metal site before CO2 and stays; the big 85%; then a good material where CO2 holds on | "In 85% of 3,000 MOFs, water takes the binding site first." |
 | 10–22 s | Console timelapse labelled "8×", ending on a DFT reveal with CO2 settling and the binding-site distances | "No API key. No cloud. It plans, picks, critiques and buys DFT, ten at a time." Add "Wi-Fi off" only if the clip's run header says `network: off`. |
 | 22–30 s | The atlas: the run's 40 purchases grow round by round on the map of 3,000 MOFs, hits flash | "Where it searched: 40 picks on the map of chemical space" |
-| 30–40 s | Result: arms chart with both baselines and intervals; URL | "Found 1.4 of the hidden good materials. Random 1.1, best simple method 2.2. Pre-registered, every number reproducible." + site URL |
+| 30–40 s | Scene `result`: four bars grow (random, the machine-learning baseline, fortyshots in the accent, the best simple method), faint intervals; URL | "Tested blind: it ties a machine-learning baseline, not yet the best simple method. Every number reproducible." + site URL |
 
 Claude cuts this from the same footage as the main video.
 

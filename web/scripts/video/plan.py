@@ -35,32 +35,34 @@ MUTED = "0x8b8b8b"
 LIVE_NOTE = ("Live demo run", "· development pool P0, not part of the benchmark")
 
 # keyword in the picture column -> clips. weight: share of the row; max: cap in seconds; at: mark or seconds.
+# Explainer scenes (scenes/*.html, recorded by record-broll.mjs like any shot): humidity, bottleneck, dflash, loop,
+# result, split. Console footage stays short and is the 8x clip where it can be.
 DEFAULT_MAIN = [
     ("Hook.", [{"shot": "hero-orbit", "at": "relax", "weight": 1}]),
-    ("The problem.", [{"shot": "why-hard", "weight": 0.55}, {"shot": "atlas-path", "at": "overview", "weight": 0.45, "max": 4.8}]),
-    ("What it runs on.", [{"live": True, "weight": 1}]),
+    ("The problem.", [{"shot": "humidity", "weight": 0.55, "max": 8.3}, {"shot": "bottleneck", "weight": 0.5}]),
+    ("What it runs on.", [{"live": True, "weight": 0.62}, {"shot": "dflash", "weight": 0.38, "max": 7.0}]),
     ("Built this week.", [{"shot": "built-card", "weight": 1}]),
     ("Watch it work", [
-        {"shot": "console-1x", "weight": 0.13},
-        {"shot": "console-8x", "weight": 0.27},
-        {"shot": "critic-veto", "weight": 0.13, "at": 0.4},
+        {"shot": "loop", "weight": 0.15, "max": 7.0},
+        {"shot": "console-8x", "at": "play", "weight": 0.21},
+        {"shot": "critic-veto", "weight": 0.11, "at": 0.4, "max": 5.0},
         {"shot": "approval-queue", "at": "approve", "weight": 0.06, "max": 3.0},
-        {"shot": "dft-reveal", "weight": 0.11, "at": 0.3},
-        {"shot": "binding-site", "at": "site", "weight": 0.13},
-        {"shot": "atlas-path", "at": "play", "weight": 0.17},
+        {"shot": "dft-reveal", "weight": 0.12, "at": 0.3},
+        {"shot": "binding-site", "at": "site", "weight": 0.15},
+        {"shot": "atlas-path", "at": "play", "weight": 0.2},
     ]),
     ("Self-check.", [{"shot": "calibrate-oracle", "weight": 1}]),
-    ("The honest result.", [{"shot": "results-arms", "weight": 1}]),
-    ("Claim check.", [{"shot": "claim-check", "weight": 1}]),
+    ("The honest result.", [{"shot": "result", "weight": 0.72}, {"shot": "claim-check", "at": "claims", "weight": 0.28}]),
+    ("The principle.", [{"shot": "split", "weight": 1}]),
     ("The frontier.", [{"shot": "approval-queue", "at": "mutants", "weight": 1}]),
     ("Close.", [{"shot": "close-card", "weight": 1}]),
 ]
 DEFAULT_X = [
     ("Hook orbit", [{"shot": "hero-orbit", "at": "relax", "weight": 1}]),
-    ("85% scatter", [{"shot": "why-hard", "weight": 1}]),
+    ("Scene `humidity`", [{"shot": "humidity", "weight": 1}]),
     ("timelapse", [{"shot": "console-8x", "at": "play", "weight": 0.6}, {"shot": "binding-site", "at": "site", "weight": 0.4}]),
     ("The atlas", [{"shot": "atlas-path", "at": "play", "weight": 1}]),
-    ("Arms chart", [{"shot": "results-arms", "at": "arms", "weight": 1}]),
+    ("Scene `result`", [{"shot": "result", "weight": 1}]),
 ]
 
 
