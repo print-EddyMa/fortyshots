@@ -1,536 +1,59 @@
-import { useEffect, useMemo, useState } from 'react';
-import { HitWord, Page, Prelim } from '../components/Chrome';
-import { ArmsChart, DiscoveryChart, ReliabilityChart, ScatterChart, type CurveSeries } from '../components/Charts';
-import { curveOf, meanHits, pick, type BaselineArm } from '../lib/baselines';
-import { hasMockRuns, isPreliminary, loadEvents } from '../lib/data';
-import { ARM_LABEL, ci, num, shortSha } from '../lib/format';
-import { href } from '../lib/router';
-import { derive } from '../lib/replay';
-import type { IndexEntry, PoolRow, Pools, Results, RunEvent } from '../lib/types';
-import { useIndex, usePools, useResults } from '../lib/useData';
-import { PREREG_URL } from '../lib/config';
+import { Page } from '../components/Chrome';
+import { ScatterChart } from '../components/Charts';
 import { PeriodicTable } from '../components/PeriodicTable';
+import { usePools } from '../lib/useData';
 
-const S = (co2: number, h2o: number) => co2 + Math.max(0, co2 - h2o + 0.1);
-
-function Reroll({ pools, results }: { pools: Pools; results: Results }) {
-  const testPools = results.pools.map((p) => p.pool).filter((p) => pools.pools[p]);
-  const [pool, setPool] = useState(testPools[0] ?? 'P1');
-  const [seedText, setSeedText] = useState('0');
-  const [out, setOut] = useState<{ arm: BaselineArm; picks: PoolRow[]; mean: number }[] | null>(null);
-  const [ms, setMs] = useState<number | null>(null);
-  const seed = Number.parseInt(seedText, 10);
-  const valid = Number.isFinite(seed) && seed >= 0 && seed < 2 ** 31;
-
-  const run = () => {
-    if (!valid) return;
-    const rows = pools.pools[pool] ?? [];
-    const t0 = performance.now();
-    const res = (['A0', 'A1', 'A2'] as BaselineArm[]).map((arm) => ({ arm, picks: pick(rows, arm, seed, results.budget), mean: meanHits(rows, arm, 200, results.budget) }));
-    setMs(performance.now() - t0);
-    setOut(res);
-  };
-  useEffect(run, [pool]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const hitsInPool = (pools.pools[pool] ?? []).filter((r) => r.hit).length;
-  const series: CurveSeries[] = (out ?? []).map((o) => ({
-    key: o.arm,
-    label: ARM_LABEL[o.arm],
-    curve: curveOf(o.picks),
-    tone: o.arm === 'A0' ? 'faint' : o.arm === 'A1' ? 'muted' : 'fg',
-    step: true,
-    digits: 0,
-    dashed: o.arm === 'A2',
-  }));
-
-  return (
-    <div className="reroll">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          run();
-        }}
-      >
-        <div className="field">
-          <span className="label" id="pool-label">
-            Pool
-          </span>
-          <div className="seg seg-sm" role="group" aria-labelledby="pool-label">
-            {testPools.map((p) => (
-              <button key={p} type="button" aria-pressed={p === pool} onClick={() => setPool(p)}>
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="seed">Seed</label>
-          <input id="seed" className="input" inputMode="numeric" value={seedText} onChange={(e) => setSeedText(e.target.value.replace(/[^0-9]/g, ''))} aria-invalid={!valid} />
-        </div>
-        <button type="submit" className="btn btn-secondary btn-sm" disabled={!valid}>
-          Re-roll
-        </button>
-        <p className="small" style={{ marginTop: 16 }}>
-          {pools.pools[pool]?.length ?? 0} MOFs, {hitsInPool} hits in {pool}. Runs in your browser on results/pools.json
-          {ms != null ? <span className="mono"> · {ms.toFixed(0)} ms</span> : ''}. Same rules as bench/arms.py, but the browser's random stream is not numpy's, so seed N here is not seed N there. A3 needs a random forest and is not re-rolled here.
-        </p>
-      </form>
-      <div className="reroll-out">
-        <div className="rows">
-          {(out ?? []).map((o) => {
-            const hits = o.picks.filter((p) => p.hit);
-            return (
-              <div className="row" key={o.arm}>
-                <span>
-                  {ARM_LABEL[o.arm]} <span className="faint mono">{o.arm}</span>
-                </span>
-                <span className="desc">
-                  <span className="ids">{hits.length ? hits.map((h) => h.id).join(' ') : 'no hits'}</span>
-                </span>
-                <span className="trail">
-                  <span className="num-big">{hits.length}</span>
-                  <span className="faint mono"> / {o.picks.length} · mean {num(o.mean, 1)}</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        {series.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <DiscoveryChart series={series} height={200} labelWidth={130} title="Hits against lookups for this seed" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function HitsAndMisses({ index, pools }: { index: IndexEntry[]; pools: Pools }) {
-  const a5 = index.filter((r) => r.arm === 'A5');
-  const [runId, setRunId] = useState(a5.find((r) => r.showcase)?.run_id ?? a5[0]?.run_id);
-  const [events, setEvents] = useState<RunEvent[] | null>(null);
-  useEffect(() => {
-    if (!runId) return;
-    setEvents(null);
-    loadEvents(runId).then(setEvents, () => setEvents([]));
-  }, [runId]);
-  const entry = a5.find((r) => r.run_id === runId);
-  const st = useMemo(() => (events ? derive(events) : null), [events]);
-  if (!a5.length || !entry) return <p className="muted">No agent runs yet.</p>;
-  const poolRows = pools.pools[entry.pool] ?? [];
-  const bought = new Set(st?.cands.filter((c) => c.order != null).map((c) => c.id));
-  const vetoes = new Map<string, string>();
-  for (const e of events ?? []) if (e.kind === 'critique') for (const v of e.payload.vetoes ?? []) vetoes.set(v.id, v.reason);
-  const found = (st?.cands ?? []).filter((c) => c.hit).sort((a, b) => (a.S ?? 0) - (b.S ?? 0));
-  const missed = poolRows
-    .filter((r) => r.hit && !bought.has(r.id))
-    .map((r) => {
-      const seen = st?.rowsSource[r.id];
-      const reason = vetoes.has(r.id)
-        ? `vetoed by the Critic: ${vetoes.get(r.id)}`
-        : seen
-          ? `surfaced in ${seen}, not picked`
-          : 'never surfaced by a query';
-      return { r, reason, S: S(r.E_CO2, r.E_H2O) };
-    })
-    .sort((a, b) => a.S - b.S);
-  return (
-    <>
-      <div className="filters">
-        <div className="seg seg-sm" role="group" aria-label="Agent run">
-          {a5.map((r) => (
-            <button key={r.run_id} type="button" aria-pressed={r.run_id === runId} onClick={() => setRunId(r.run_id)}>
-              {r.pool} · s{r.seed}
-            </button>
-          ))}
-        </div>
-        <a className="link-quiet small mono" href={href(`/console/${encodeURIComponent(entry.run_id)}`)}>
-          {entry.run_id} ↗
-        </a>
-      </div>
-      <div className="split">
-        <div>
-          <h3 className="fig-title">Found</h3>
-          <p className="fig-sub">{found.length} hits bought, strongest first.</p>
-          <div className="table-scroll" tabIndex={0}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th className="r">Lookup</th>
-                  <th className="r">E_CO2 (eV)</th>
-                  <th className="r">E_H2O (eV)</th>
-                  <th className="r">P(hit)</th>
-                  <th>Hit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {found.map((c) => (
-                  <tr key={c.id}>
-                    <td className="n">{c.id}</td>
-                    <td className="n r">{c.order}</td>
-                    <td className="n r">{num(c.E_CO2, 2)}</td>
-                    <td className="n r">{num(c.E_H2O, 2)}</td>
-                    <td className="n r">{num(c.p_hit, 2)}</td>
-                    <td>
-                      <HitWord hit={c.hit} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div>
-          <h3 className="fig-title">Missed</h3>
-          <p className="fig-sub">
-            {missed.length} hits in {entry.pool} the agent did not buy, and why.
-          </p>
-          <div className="table-scroll" tabIndex={0}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th className="r">E_CO2 (eV)</th>
-                  <th>Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {missed.map(({ r, reason }) => (
-                  <tr key={r.id}>
-                    <td className="n">{r.id}</td>
-                    <td className="n r">{num(r.E_CO2, 2)}</td>
-                    <td className="missed-reason">{reason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
+/** The science page: what these materials are, and why finding a good one is hard. Real ODAC23 data only. */
 export function ResultsPage() {
-  const results = useResults();
   const pools = usePools();
-  const index = useIndex();
-  const R = results.data;
-  const [parityPool, setParityPool] = useState<string | null>(null);
-
-  if (!R) {
-    return (
-      <Page current="/results">
-        <section className="wrap page-head">
-          <p className="muted">{results.error ? `Could not load results.json: ${results.error}` : 'Loading results…'}</p>
-        </section>
-      </Page>
-    );
-  }
-  const arm = (a: string) => R.arms.find((x) => x.arm === a);
-  const a5 = arm('A5');
-  const a3 = arm('A3');
-  const a2 = arm('A2');
-  const a0 = arm('A0');
-  const prelim = isPreliminary(R, index.data);
-  const order = ['A5', 'A6', 'A4', 'A3', 'A2', 'A1', 'A0'];
-  const armsSorted = [...R.arms].sort((a, b) => order.indexOf(a.arm) - order.indexOf(b.arm));
-  const pp = parityPool ?? R.pools[0]?.pool ?? 'P1';
-  const parityRows = pools.data?.pools[pp] ?? [];
-
-  const curves: CurveSeries[] = armsSorted
-    .slice()
-    .reverse()
-    .map((a) => ({
-      key: a.arm,
-      label: ARM_LABEL[a.arm] ?? a.label,
-      curve: a.curve,
-      lo: a.arm === 'A5' || a.arm === 'A3' || a.arm === 'A0' ? a.curve_lo : undefined,
-      hi: a.arm === 'A5' || a.arm === 'A3' || a.arm === 'A0' ? a.curve_hi : undefined,
-      band: a.arm === 'A5' || a.arm === 'A0',
-      tone: a.arm === 'A5' ? 'fg' : a.arm === 'A3' || a.arm === 'A6' ? 'muted' : 'faint',
-      width: a.arm === 'A5' ? 1.5 : 1,
-      dashed: a.kind === 'baseline' && a.arm !== 'A0',
-    }));
+  const rows = pools.data ? Object.values(pools.data.pools).flat() : [];
+  const hits = rows.filter((r) => r.hit).length;
+  const waterWins = rows.length ? rows.filter((r) => r.E_H2O < r.E_CO2).length / rows.length : 0;
 
   return (
     <Page current="/results">
       <section className="wrap page-head">
         <h1 className="h-section">
-          <span>Does it work?</span>
-          <span className="second">We tested it fairly, blind.</span>
+          <span>Rooms for chemistry.</span>
+          <span className="second">Why finding the right one is hard.</span>
         </h1>
         <p className="lede">
-          Each method gets 40 tests to find the good CO2 capturers hidden among 500 materials.
-        </p>
-        {prelim && <Prelim status={R.status} mockRuns={hasMockRuns(index.data)} />}
-      </section>
-
-      <section className="wrap">
-        <div className="bigbars">
-          {[
-            { label: 'Random picks', v: a0?.hits_mean },
-            { label: 'Machine learning', v: a3?.hits_mean },
-            { label: 'fortyshots', v: a5?.hits_mean, us: true },
-            { label: 'Best simple method', v: a2?.hits_mean },
-          ].map((b) => (
-            <div key={b.label} className={`bigbar${b.us ? ' us' : ''}`}>
-              <span className="bigbar-label">{b.label}</span>
-              <span className="bigbar-track">
-                <span className="bigbar-fill" style={{ width: `${Math.min(100, ((b.v ?? 0) / 3) * 100)}%` }} />
-              </span>
-              <span className="bigbar-val mono">{b.v != null ? num(b.v, 1) : '—'}</span>
-            </div>
-          ))}
-        </div>
-        <p className="fig-sub">
-          Good materials found, averaged over five sets. fortyshots matches machine learning, not yet the best simple method, and
-          every claim it makes is checked against the physics.
+          A metal–organic framework is a crystal built from metal corners and carbon struts, full of pores a few atoms wide. In
+          humid air, most of those pores fill with water before CO2 can get in.
         </p>
       </section>
 
       <section className="wrap section">
-        <h2 className="fig-title" id="why-hard">Why it&apos;s hard</h2>
+        <h2 className="fig-title" id="why-hard">Water usually wins</h2>
         {pools.data ? (
-          (() => {
-            const rows = Object.values(pools.data.pools).flat();
-            const hits = rows.filter((r) => r.hit).length;
-            const waterWins = rows.filter((r) => r.E_H2O < r.E_CO2).length / (rows.length || 1);
-            return (
-              <>
-              <p className="fig-sub">
-                In <span className="callout mono">{Math.round(waterWins * 100)}%</span> of materials, water binds more strongly than CO2
-                (above the line). Filled dots are the good ones.
-              </p>
-              <ScatterChart
-                points={rows.map((r) => ({ x: r.E_H2O, y: r.E_CO2, strong: r.hit, id: r.id }))}
-                xLabel="Water binding (eV)"
-                yLabel="CO2 binding (eV)"
-                height={360}
-                ariaLabel={`CO2 versus water binding energy for ${rows.length} MOFs, ${hits} hits`}
-                annotation={`${rows.length.toLocaleString()} materials · ${hits} good ones`}
-              />
-              </>
-            );
-          })()
+          <>
+            <p className="fig-sub">
+              Each dot is a material. Above the line, water holds on more strongly than CO2: that is{' '}
+              <span className="callout mono">{Math.round(waterWins * 100)}%</span> of them. Filled dots are the few that hold CO2 best.
+            </p>
+            <ScatterChart
+              points={rows.map((r) => ({ x: r.E_H2O, y: r.E_CO2, strong: r.hit, id: r.id }))}
+              xLabel="Water binding (eV)"
+              yLabel="CO2 binding (eV)"
+              height={360}
+              ariaLabel={`CO2 versus water binding energy for ${rows.length} materials, ${hits} hold CO2 best`}
+              annotation={`${rows.length.toLocaleString()} materials · ${hits} good ones`}
+            />
+          </>
         ) : (
-          <p className="muted">{pools.error ?? 'Loading pools…'}</p>
+          <p className="muted">{pools.error ?? 'Loading…'}</p>
         )}
       </section>
 
       <section className="wrap section" id="metals">
-        <h2 className="fig-title">Best metals</h2>
-        <p className="fig-sub">
-          Darker means more of the materials with that metal capture CO2 well.
-        </p>
+        <h2 className="fig-title">Which metals make the best rooms</h2>
+        <p className="fig-sub">Darker means more of the materials with that metal capture CO2 well.</p>
         {pools.data ? (
-          <PeriodicTable rows={Object.values(pools.data.pools).flat()} label="Periodic table of DFT hit rates by metal" />
+          <PeriodicTable rows={rows} label="Periodic table of how often materials with each metal capture CO2 well" />
         ) : (
-          <p className="muted">{pools.error ?? 'Loading pools…'}</p>
+          <p className="muted">{pools.error ?? 'Loading…'}</p>
         )}
       </section>
-
-      <details className="wrap more-stats">
-        <summary className="label">Full statistics</summary>
-      <section className="wrap section">
-        <div className="split">
-          <div>
-            <h2 className="fig-title">Finds per method</h2>
-            <p className="fig-sub">Mean and 95% interval (hierarchical bootstrap). Dashed line: random expectation.</p>
-            <ArmsChart
-              arms={armsSorted.map((a) => ({ key: a.arm, label: ARM_LABEL[a.arm] ?? a.label, mean: a.hits_mean, lo: a.hits_ci[0], hi: a.hits_ci[1], strong: a.arm === 'A5' }))}
-              reference={a0 ? { v: a0.hits_mean, label: 'random' } : undefined}
-            />
-          </div>
-          <div>
-            <h2 className="fig-title">Progress per test</h2>
-            <p className="fig-sub">Mean hits after each lookup. Bands are 95% intervals.</p>
-            <DiscoveryChart series={curves} height={280} labelWidth={150} />
-          </div>
-        </div>
-      </section>
-
-      <section className="wrap section">
-        <h2 className="fig-title">Pre-registered tests</h2>
-        <p className="fig-sub">
-          Primary endpoint: A5 minus A2 (MACE-greedy, the strongest baseline) in mean hits at 40, pool-stratified permutation test, one-sided. Frozen in{' '}
-          <a className="link" href={PREREG_URL}>
-            PREREG.md
-          </a>{' '}
-          at <span className="mono">{shortSha(R.prereg_sha)}</span>.
-        </p>
-        <div className="table-scroll" tabIndex={0}>
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Comparison</th>
-                <th className="r">Difference (hits)</th>
-                <th className="r">95% CI</th>
-                <th className="r">p</th>
-              </tr>
-            </thead>
-            <tbody>
-              {R.tests.map((t) => (
-                <tr key={t.name}>
-                  <td>{t.name}</td>
-                  <td className="n r">{num(t.diff, 2, true)}</td>
-                  <td className="n r">
-                    {num(t.ci[0], 2)} to {num(t.ci[1], 2)}
-                  </td>
-                  <td className="n r">{t.p < 0.001 ? '< 0.001' : num(t.p, 3)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="wrap section" id="reroll">
-        <h2 className="fig-title">Try it yourself</h2>
-        <p className="fig-sub">Re-roll the cheap baselines on any test pool with your own seed. Same definitions as the pre-registration.</p>
-        {pools.data ? <Reroll pools={pools.data} results={R} /> : <p className="muted">{pools.error ?? 'Loading pools…'}</p>}
-      </section>
-
-      <section className="wrap section">
-        <div className="split">
-          <div>
-            <h2 className="fig-title">Estimates vs. simulations</h2>
-            <p className="fig-sub">MACE S against DFT S for every MOF in {pp}. Filled: hits. Never shown to the agent.</p>
-            <div className="filters">
-              <div className="seg seg-sm" role="group" aria-label="Pool">
-                {R.pools.map((p) => (
-                  <button key={p.pool} type="button" aria-pressed={p.pool === pp} onClick={() => setParityPool(p.pool)}>
-                    {p.pool}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {parityRows.length > 0 && (
-              <ScatterChart
-                points={parityRows.filter((r) => r.S_mace != null).map((r) => ({ x: r.S_mace, y: S(r.E_CO2, r.E_H2O), strong: r.hit, id: r.id }))}
-                xLabel="MACE S (eV)"
-                yLabel="DFT S (eV)"
-                ariaLabel={`MACE versus DFT score for ${parityRows.length} MOFs in pool ${pp}`}
-                annotation={`n = ${parityRows.length} · ${parityRows.filter((r) => r.hit).length} hits · dashed: y = x`}
-              />
-            )}
-          </div>
-          <div>
-            <h2 className="fig-title">What physics models miss</h2>
-            <p className="fig-sub">Hit-ranking AUC (0.5 is chance) and energy error at the DFT geometry.</p>
-            <dl className="kv-list">
-              <div>
-                <dt>MACE-MP-0, initial placements</dt>
-                <dd>
-                  {num(R.honesty.mace_auc, 2)} <span className="faint">[{ci(R.honesty.mace_auc_ci[0], R.honesty.mace_auc_ci[1], 2)}]</span>
-                </dd>
-              </div>
-              <div>
-                <dt>MACE after gas-only relaxation</dt>
-                <dd>{num(R.honesty.gas_relax_auc, 2)}</dd>
-              </div>
-              <div>
-                <dt>DFT at the initial geometry</dt>
-                <dd>{num(R.honesty.dft_init_auc, 2)}</dd>
-              </div>
-              <div>
-                <dt>MACE MAE at DFT geometry</dt>
-                <dd>
-                  {num(R.honesty.mace_mae_dft_geom, 3)} <span className="faint">eV</span>
-                </dd>
-              </div>
-              <div>
-                <dt>eqV2-ODAC MAE at DFT geometry</dt>
-                <dd>
-                  {num(R.honesty.eqv2_mae_dft_geom, 3)} <span className="faint">eV</span>
-                </dd>
-              </div>
-            </dl>
-            {R.honesty.notes && <p className="small" style={{ marginTop: 12 }}>{R.honesty.notes}</p>}
-          </div>
-        </div>
-      </section>
-
-      <section className="wrap section">
-        <div className="split">
-          <div>
-            <h2 className="fig-title">Confidence</h2>
-            <p className="fig-sub">
-              Proposer's stated P(hit) against the observed hit rate. Brier {num(R.calibration?.brier, 3)}, n = {R.calibration?.n ?? '—'}.
-            </p>
-            {R.calibration?.bins.length ? <ReliabilityChart bins={R.calibration.bins} /> : <p className="muted">No calibration data.</p>}
-          </div>
-          <div>
-            <h2 className="fig-title">Vision, leakage, claims</h2>
-            <p className="fig-sub">Checks that the model reads its plots, is not recalling answers, and cites what it says.</p>
-            <dl className="kv-list">
-              <div>
-                <dt>Critic visual ρ vs computed ρ, MAE</dt>
-                <dd>
-                  {num(R.critic?.visual_rho_mae, 2)} <span className="faint">n = {R.critic?.n ?? '—'}</span>
-                </dd>
-              </div>
-              <div>
-                <dt>Leak probe L: rank refcodes, AUC</dt>
-                <dd>{num(R.leak?.L_auc, 2)}</dd>
-              </div>
-              <div>
-                <dt>Leak probe L2, AUC</dt>
-                <dd>{num(R.leak?.L2_auc, 2)}</dd>
-              </div>
-              <div>
-                <dt>Report claims verified</dt>
-                <dd>
-                  {R.claims ? `${R.claims.verified} / ${R.claims.n}` : '—'} <span className="faint">{R.claims ? `${R.claims.flagged} flagged` : ''}</span>
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </section>
-
-      <section className="wrap section">
-        <h2 className="fig-title">Best possible scores</h2>
-        <p className="fig-sub">What a perfect oracle, DFT at the unrelaxed geometry, and random would find with 40 lookups.</p>
-        <div className="table-scroll" tabIndex={0}>
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Pool</th>
-                <th className="r">MOFs</th>
-                <th className="r">Hits in pool</th>
-                <th className="r">Perfect oracle</th>
-                <th className="r">DFT, initial geometry</th>
-                <th className="r">Random, expected</th>
-              </tr>
-            </thead>
-            <tbody>
-              {R.ceilings.map((c) => {
-                const p = R.pools.find((x) => x.pool === c.pool);
-                return (
-                  <tr key={c.pool}>
-                    <td className="n">{c.pool}</td>
-                    <td className="n r">{p?.n ?? '—'}</td>
-                    <td className="n r">{p?.hits ?? '—'}</td>
-                    <td className="n r">{c.oracle_hits}</td>
-                    <td className="n r">{c.dft_init_hits}</td>
-                    <td className="n r">{num(c.random_expected, 2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="wrap section">
-        <h2 className="fig-title">Every test</h2>
-        <p className="fig-sub">From the ledger of each Glimmer agent run.</p>
-        {index.data && pools.data ? <HitsAndMisses index={index.data} pools={pools.data} /> : <p className="muted">Loading…</p>}
-      </section>
-      </details>
-
     </Page>
   );
 }

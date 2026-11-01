@@ -132,23 +132,7 @@ for (const vp of [
   await ctx.close();
 }
 
-// ---------------------------------------------------------------- re-roll speed
-{
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto(`${base}#/results`, { waitUntil: 'networkidle' });
-  await page.click('.more-stats > summary');  // the re-roll lives in the collapsed full statistics
-  await page.waitForSelector('#seed');
-  await page.fill('#seed', '1234');
-  const t = await page.evaluate(async () => {
-    const t0 = performance.now();
-    document.querySelector('#reroll button[type=submit]').click();
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    return performance.now() - t0;
-  });
-  const shown = await page.locator('#reroll .reroll-out .row').count();
-  check('results: re-roll A0/A1/A2 under 1 s', t < 1000 && shown === 3, `${t.toFixed(0)} ms incl. render`);
-  await page.close();
-}
+// (re-roll removed: the science page shows data, not baselines)
 
 // ---------------------------------------------------------------- live mode against the stub
 {

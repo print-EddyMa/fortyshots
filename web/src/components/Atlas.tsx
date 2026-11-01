@@ -331,6 +331,7 @@ export function AtlasPlayer({ atlas, pool, seqs, batch = 10 }: { atlas: AtlasDat
         ariaLabel={`Map of ${atlas.n} MOFs. ${seq.label} bought ${seq.ids.length} in pool ${pool}; ${seq.ids.filter((_, k) => hitAt(k)).length} were hits.`}
       />
       <div className="atlas-side">
+        {seqs.length > 1 && (
         <div className="seg seg-sm" role="group" aria-label="Campaign on the map">
           {seqs.map((s) => (
             <button
@@ -348,6 +349,7 @@ export function AtlasPlayer({ atlas, pool, seqs, batch = 10 }: { atlas: AtlasDat
             </button>
           ))}
         </div>
+        )}
         <div>
           <div className="atlas-count" aria-live="polite">
             {hitsSoFar}

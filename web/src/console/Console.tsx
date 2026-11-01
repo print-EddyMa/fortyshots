@@ -27,7 +27,7 @@ export interface ConsoleProps {
   liveNetwork?: string | null;
 }
 
-export function Console({ runId, events, pb, results, embedded, liveStatus, liveNetwork }: ConsoleProps) {
+export function Console({ runId, events, pb, embedded, liveStatus, liveNetwork }: ConsoleProps) {
   const state = useMemo(() => derive(events, pb.cursor), [events, pb.cursor]);
   const [tab, setTab] = useState<Tab>('trace');
   const [selected, setSelected] = useState<string | null>(null);
@@ -84,10 +84,6 @@ export function Console({ runId, events, pb, results, embedded, liveStatus, live
   const pendingCount = state.pending ? state.pending.picks.length : 0;
 
   const series: CurveSeries[] = [];
-  const a0 = results?.arms.find((a) => a.arm === 'A0');
-  const a3 = results?.arms.find((a) => a.arm === 'A3');
-  if (a0) series.push({ key: 'A0', label: 'Random', curve: a0.curve, lo: a0.curve_lo, hi: a0.curve_hi, tone: 'faint', band: true });
-  if (a3) series.push({ key: 'A3', label: 'RF-UCB', curve: a3.curve, lo: a3.curve_lo, hi: a3.curve_hi, tone: 'muted', band: true, dashed: true });
   series.push({ key: 'run', label: 'This run', curve: state.curve, tone: 'fg', step: true, width: 1.5, digits: 0 });
 
   const jumpToCall = (cid: string) => {

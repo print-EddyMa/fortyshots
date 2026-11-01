@@ -22,7 +22,7 @@ export function Nav({ current }: { current?: string }) {
         <Wordmark />
         <nav className="nav-links" aria-label="Main">
           {item('/method', 'Method')}
-          {item('/results', 'Results')}
+          {item('/results', 'Science')}
           {item('/runs', 'Runs')}
           <a href={REPO_URL} className="nav-link nav-code">
             Code
@@ -45,7 +45,7 @@ export function Footer() {
           <Wordmark />
           <nav className="footer-links" aria-label="Footer">
             <a className="link-quiet" href={href('/method')}>Method</a>
-            <a className="link-quiet" href={href('/results')}>Results</a>
+            <a className="link-quiet" href={href('/results')}>Science</a>
             <a className="link-quiet" href={href('/runs')}>Runs</a>
             <a className="link-quiet" href={REPO_URL}>Code</a>
             <a className="link-quiet" href="./licenses/Geist-OFL-1.1.txt">Font licenses</a>

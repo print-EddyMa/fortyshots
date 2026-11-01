@@ -7,7 +7,6 @@ import { loadAtlas, type AtlasData } from '../lib/chemData';
 import { derive } from '../lib/replay';
 import { REPO_URL } from '../lib/config';
 import { hasMockRuns, isPreliminary, loadEvents, pickShowcase } from '../lib/data';
-import { num } from '../lib/format';
 import { href } from '../lib/router';
 import type { IndexEntry, Results, RunEvent } from '../lib/types';
 import { useIndex, useResults } from '../lib/useData';
@@ -109,21 +108,18 @@ function AtlasSection({ showcase }: { showcase: IndexEntry }) {
   }, [showcase.run_id]);
   if (!atlas || !agent) return null;
   const pool = showcase.pool;
-  const paths = atlas.paths.by_pool[pool] ?? {};
   const mock = showcase.mode === 'mock' || showcase.run_id.startsWith('mock-');
   const seqs: AtlasSeq[] = [];
   if (agent.length) seqs.push({ key: 'agent', label: 'fortyshots', ids: agent, note: `${showcase.run_id}${mock ? ' · mock run' : ''}` });
-  if (paths.A0) seqs.push({ key: 'A0', label: 'Random', ids: paths.A0, note: `Random baseline, seed ${atlas.paths.seed}, results/baselines.parquet` });
-  if (paths.A2) seqs.push({ key: 'A2', label: 'Best existing', ids: paths.A2, note: `Tests the materials a quick physics estimate likes most (MACE-greedy), seed ${atlas.paths.seed}` });
-  if (paths.A3) seqs.push({ key: 'A3', label: 'ML model', ids: paths.A3, note: `A random-forest model trained on results so far picks the next tests (RF-UCB), seed ${atlas.paths.seed}` });
   return (
     <section className="wrap section" id="atlas">
       <div className="section-head">
-        <h2 className="label">How it searches</h2>
+        <h2 className="label">One map, thousands of materials</h2>
         <span className="small mono">{atlas.n.toLocaleString()} materials</span>
       </div>
       <p className="section-lede">
-        Each dot is a material. The path is the order it tested them.
+        Each dot is a material, and similar materials sit together. The numbered path is where the AI chose to look, ten tests at a
+        time.
       </p>
       <AtlasPlayer atlas={atlas} pool={pool} seqs={seqs} />
     </section>
@@ -135,12 +131,6 @@ export function Landing() {
   const index = useIndex();
   const R = results.data;
   const showcase = index.data ? pickShowcase(index.data) : null;
-  const arm = (a: string) => R?.arms.find((x) => x.arm === a);
-  const a5 = arm('A5');
-  const a0 = arm('A0');
-  const a3 = arm('A3');
-  // The strongest non-LLM arm on these pools (PREREG H1 comparator), never a hand-picked one.
-  const best = R?.arms.filter((x) => x.kind === 'baseline').reduce<typeof a0>((b, x) => (!b || x.hits_mean > b.hits_mean ? x : b), undefined);
   const prelim = isPreliminary(R, index.data);
 
 
@@ -149,18 +139,19 @@ export function Landing() {
       <section className="wrap hero">
         <h1 className="display">
           <span>Find any material.</span>
-          <span className="second">Describe it. An AI scientist runs the search.</span>
+          <span className="second">An AI scientist picks the experiments.</span>
         </h1>
         <div className="hero-row">
           <p className="lede">
-            fortyshots decides which experiments to run, learns from every result, and shows its reasoning.
+            Chemists have built tens of thousands of metal–organic frameworks, the crystal sponges behind the 2025 Nobel Prize in
+            Chemistry. fortyshots searches them like a scientist: it plans, tests the most promising and learns from every result.
           </p>
           <div className="hero-cta">
             <a className="btn btn-primary btn-lg" href={href(showcase ? `/console/${encodeURIComponent(showcase.run_id)}` : '/console')}>
               Watch it work <span className="arrow" aria-hidden>→</span>
             </a>
             <a className="btn btn-secondary btn-lg" href={href('/results')}>
-              Results
+              The science
             </a>
           </div>
         </div>
@@ -174,7 +165,8 @@ export function Landing() {
       <section className="wrap">
         <HeroMof />
         <p className="small muted fig-note">
-          A real find: CO2 (orange) held inside a zinc framework.
+          A crystal with rooms for molecules: metal corners joined by carbon struts. Orange is CO2, resting where the physics
+          says it settles.
         </p>
       </section>
 
@@ -195,40 +187,11 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="wrap section">
-        <div className="section-head">
-          <h2 className="label">Results</h2>
-          <a className="link-quiet label" href={href('/results')}>
-            Full results <span aria-hidden>→</span>
-          </a>
-        </div>
-        <div className="bigbars">
-          {[
-            { label: 'Random picks', v: a0?.hits_mean },
-            { label: 'Machine learning', v: a3?.hits_mean },
-            { label: 'fortyshots', v: a5?.hits_mean, us: true },
-            { label: 'Best simple method', v: best?.hits_mean },
-          ].map((b) => (
-            <div key={b.label} className={`bigbar${b.us ? ' us' : ''}`}>
-              <span className="bigbar-label">{b.label}</span>
-              <span className="bigbar-track">
-                <span className="bigbar-fill" style={{ width: `${Math.min(100, ((b.v ?? 0) / 3) * 100)}%` }} />
-              </span>
-              <span className="bigbar-val mono">{b.v != null ? num(b.v, 1) : '—'}</span>
-            </div>
-          ))}
-        </div>
-        <p className="small muted">
-          Good materials found with 40 tests among 500 candidates, scored blind.{' '}
-          <a href={href('/results')}>See how</a>
-        </p>
-      </section>
-
       {showcase && <AtlasSection showcase={showcase} />}
 
       <section className="wrap section">
         <div className="section-head">
-          <h2 className="label">Watch it work</h2>
+          <h2 className="label">Watch it think</h2>
         </div>
         {showcase && <Hero showcase={showcase} results={R} />}
       </section>
@@ -239,18 +202,18 @@ export function Landing() {
         </div>
         <div className="rows how">
           <div className="row">
-            <span className="name">Model</span>
-            <span className="desc">Meta Muse Glimmer 30B. Plans, picks, critiques and reports.</span>
+            <span className="name">The scientist</span>
+            <span className="desc">Meta&apos;s open Muse Glimmer 30B. Plans, picks, looks at structures and writes the report.</span>
             <span className="trail">llama.cpp</span>
           </div>
           <div className="row">
-            <span className="name">Estimates</span>
-            <span className="desc">Fast physics on every candidate. Cheap, often wrong.</span>
+            <span className="name">The quick look</span>
+            <span className="desc">A fast physics estimate for every candidate. Free, but often wrong.</span>
             <span className="trail">precomputed</span>
           </div>
           <div className="row">
-            <span className="name">Simulations</span>
-            <span className="desc">Accurate quantum chemistry from Meta&apos;s Open DAC data. 40 per search.</span>
+            <span className="name">The real test</span>
+            <span className="desc">Accurate quantum chemistry from Meta FAIR&apos;s Open DAC. Forty per search, each one chosen.</span>
             <span className="trail">40 lookups</span>
           </div>
           <div className="row">

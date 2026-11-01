@@ -1,5 +1,5 @@
 {
- "at": "2026-11-01T01:23:47.777Z",
+ "at": "2026-11-01T01:37:54.573Z",
  "showcase": "A5-P1-s0-202610302250",
  "results": [
   {
@@ -95,7 +95,7 @@
   {
    "name": "trace shows report, claimcheck, summary; flags in --fail; every error event visible",
    "ok": true,
-   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793496217476\",\"caption\":\"m85ee3ce · C36H12O16Zn3 · 67 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":4,\"errorItems\":0,\"nErrors\":0}"
+   "detail": "{\"lookups\":\"lookups 40 / 40\",\"phase\":\"done\",\"morphedAttr\":\"1793497065159\",\"caption\":\"m85ee3ce · C36H12O16Zn3 · 67 atoms · DFT-relaxed geometry, ODAC23\",\"trace\":3,\"flagged\":4,\"errorItems\":0,\"nErrors\":0}"
   },
   {
    "name": "queue (static): j/r/a marks 2 picks, sends one reject decision, saved locally",
@@ -106,11 +106,6 @@
    "name": "queue: no console errors",
    "ok": true,
    "detail": ""
-  },
-  {
-   "name": "results: re-roll A0/A1/A2 under 1 s",
-   "ok": true,
-   "detail": "56 ms incl. render"
   },
   {
    "name": "live: events stream over SSE",
