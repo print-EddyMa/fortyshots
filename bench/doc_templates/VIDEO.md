@@ -26,7 +26,7 @@ Length: 3:00 or less (about 390 words of narration, roughly 2:45 spoken). The ju
 | 1:58–2:28 | The honest result. Results page: the arms chart with intervals and both baselines labelled, the discovery curves, the reliability plot, the leak probe line, the `prereg-v1` hash | "Does it work? We pre-registered the test and scored it blind. With forty tests, the agent found 1.4 good materials. Random finds 1.1; the best simple method, 2.2. It doesn't beat that yet, but its confidence is well calibrated, and nine in ten of its claims check out." |
 | 2:28–2:36 | Claim check. The claim-check panel: claims, verified, flagged | "Every number it writes is checked against the computation it came from." |
 | 2:36–2:48 | The frontier. The approval queue with a proposed mutant relaxing in 3D, labelled unvalidated · ML only; approve. Without mutants in the run: the queue and the structure of the open batch | "Then it proposes new materials — modified frameworks, built and relaxed by simulation, ranked by what it learned. Unvalidated, so a person decides what gets tested next." |
-| 2:48–3:00 | Close. Terminal-style card: `git clone github.com/print-EddyMa/fortyshots && ./lab verify` typed, then the repo and site URLs; lower third "Built Oct 27 – Nov 4, 2026 · {{N_COMMITS}} commits since hackathon-start" | "The same loop works wherever experiments are expensive — electrolytes, catalysts. It's open: clone it and run it on your own laptop." |
+| 2:48–3:00 | Close. Terminal-style card: `git clone github.com/print-EddyMa/fortyshots && ./lab verify` typed, then the repo and site URLs; lower third "Built Oct 27 – Nov 4, 2026 · {{N_COMMITS}} commits since hackathon-start" | "The same loop works for batteries and catalysts. The AI decides what to test; physics decides what's true. Check every number yourself." |
 
 About 390 words of narration (one variant at 1:40). At a calm 140 words per minute that is about 2:45 of speech, so keep the pauses short; `captions.py` refuses a cut that runs past 3:00.
 
@@ -52,6 +52,8 @@ About 390 words of narration (one variant at 1:40). At a calm 140 words per minu
 5. [ ] `./lab push`, then `./lab push-media ~/Desktop/voice.m4a ~/Desktop/live.mov` (both end with a line starting `pushed`).
 
 Claude then cuts the video from your two files plus browser B-roll (captions, speed labels, lower third) and sends it back for review. You upload the final file as unlisted to a video account you already have and paste the link into SUBMISSION.md.
+
+**Upload title:** `fortyshots — an AI scientist that shows its work` · **Description, first line:** `The AI decides what to test. Physics decides what's true. Meta's Muse Glimmer 30B, Meta Global AI Developer Hackathon 2026.` Then the site and repo links.
 
 ## How to assemble (in the container)
 

@@ -1,41 +1,56 @@
 # fortyshots
 
-An offline AI lab that decides which expensive experiment to run next, and shows its work.
+**An AI scientist for materials discovery. It decides which experiments to run, learns from each result, and shows its work.**
 
-- **What it does.** Meta's open-weights **Muse Glimmer 30B** runs on a 24 GB MacBook and plays four roles (director, proposer, critic, reporter) in an agent that has 40 hidden-DFT lookups to find metal-organic frameworks (MOFs) that bind CO2 more strongly than water, out of a pool of 500.
-- **How it is scored.** The "experiments" are Meta FAIR's ODAC23 DFT labels, sealed until the agent pays for them. Every campaign is pre-registered ([PREREG.md](PREREG.md)) and compared with random choice and a random-forest active learner, with bootstrap confidence intervals.
-- **How it runs.** Fully local: llama.cpp `llama-server` on the Mac, no API key, no account, no cloud inference. `git clone` and `./lab verify` recompute every published number without a model.
+![Muse Glimmer 30B](https://img.shields.io/badge/Meta-Muse_Glimmer_30B-0866FF) ![DFlash](https://img.shields.io/badge/Meta-DFlash_speculative_decoding-0866FF) ![ODAC23](https://img.shields.io/badge/Meta_FAIR-Open_DAC_2023-0866FF) ![llama.cpp](https://img.shields.io/badge/runs_on-llama.cpp-555) ![pre-registered](https://img.shields.io/badge/pre--registered-prereg--v1-555) ![license](https://img.shields.io/badge/license-Apache--2.0-555)
 
-Site: https://print-EddyMa.github.io/fortyshots/ · Video: {{VIDEO_URL}} · Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon.
+**[Live site: watch a real campaign](https://print-EddyMa.github.io/fortyshots/)** · **[Demo video (3:00)]({{VIDEO_URL}})** · [Results](https://print-EddyMa.github.io/fortyshots/#/results) · [Pre-registration](PREREG.md)
+
+> The AI decides what to test. Physics decides what's true. Every number it writes is checked.
+
+![A real campaign in the console](web/screenshots/console-end-1440.png)
+*A real campaign on a test set: Muse Glimmer 30B picks ten materials per round with a stated confidence, critiques them by looking at the structures, and buys accurate simulations (DFT) one batch at a time.*
+
+**3-minute demo:** goal → plan → pick 10 with confidence → critique with vision → you approve → 10 simulations → learn → ×4 → cited report → proposed new materials
+
+> **Scope.** A research prototype, scored against existing DFT reference data. Its picks are among known materials, not new discoveries, and the materials it proposes are unvalidated. Every limitation is listed [below](#limitations).
+
+**Check every number with no model, no keys and no account:**
+
+```bash
+git clone https://github.com/print-EddyMa/fortyshots && cd fortyshots && ./lab verify
+```
+
+Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon. To run the agent itself on a Mac, see [MAC_SETUP.md](MAC_SETUP.md).
 
 ---
 
 ## Results
 
-Status: **{{RESULTS_STATUS}}** (filled from `results/results.json`; `./lab verify` recomputes it). Pre-registration: tag `prereg-v1`, sha256 `{{PREREG_SHA}}`.
+Status: **final** (filled from `results/results.json`; `./lab verify` recomputes it). Pre-registration: tag `prereg-v1`, sha256 `f5b216f38f4bd362fc93deb3f6a48d73e89a35fd7c40701e230299ba45c33638`.
 
 Headline (the rule in PREREG §9 decides its wording; it always names both baselines):
-> {{HEADLINE}}
+> The Glimmer agent (A5) picked 1.40 hits in 40 lookups (95% CI 1.00–1.80) against 1.13 for random and 2.20 for the strongest baseline, greedy on the cheap simulator (MACE-greedy): it ties random, loses to MACE-greedy (difference -0.80, p = 1.000) and ties the random forest (RF-UCB, 1.39).
 
 | Arm | What it is | Runs | Hits in 40 (mean, 95% CI) | Enrichment | Lookups per hit |
 |---|---|---|---|---|---|
-| A0 | Random | {{A0_N}} | {{A0_HITS}} [{{A0_LO}}, {{A0_HI}}] | {{A0_ENR}} | {{A0_LPH}} |
-| A1 | Pore and open-metal-site heuristic | {{A1_N}} | {{A1_HITS}} [{{A1_LO}}, {{A1_HI}}] | {{A1_ENR}} | {{A1_LPH}} |
-| A2 | Greedy on the cheap simulator (MACE) | {{A2_N}} | {{A2_HITS}} [{{A2_LO}}, {{A2_HI}}] | {{A2_ENR}} | {{A2_LPH}} |
-| A3 | Random-forest active learner (RF-UCB) | {{A3_N}} | {{A3_HITS}} [{{A3_LO}}, {{A3_HI}}] | {{A3_ENR}} | {{A3_LPH}} |
-| A4 | Glimmer, zero-shot (orders 40 at once) | {{A4_N}} | {{A4_HITS}} [{{A4_LO}}, {{A4_HI}}] | {{A4_ENR}} | {{A4_LPH}} |
-| **A5** | **Glimmer agent, 4 rounds of 10** | {{A5_N}} | {{A5_HITS}} [{{A5_LO}}, {{A5_HI}}] | {{A5_ENR}} | {{A5_LPH}} |
-| A6 | A5 without the random-forest tool | {{A6_N}} | {{A6_HITS}} [{{A6_LO}}, {{A6_HI}}] | {{A6_ENR}} | {{A6_LPH}} |
+| A0 | Random | 250 | 1.13 [0.95, 1.32] | 1.01× | 35.3 |
+| A1 | Pore and open-metal-site heuristic | 250 | 1.00 [0.00, 2.20] | 0.89× | 40.0 |
+| A2 | Greedy on the cheap simulator (MACE) | 250 | 2.20 [2.00, 2.60] | 2.01× | 18.2 |
+| A3 | Random-forest active learner (RF-UCB) | 250 | 1.39 [1.17, 1.62] | 1.25× | 28.8 |
+| A4 | Glimmer, zero-shot (orders 40 at once) | 5 | 1.40 [1.00, 1.80] | 1.23× | 28.6 |
+| **A5** | **Glimmer agent, 4 rounds of 10** | 5 | 1.40 [1.00, 1.80] | 1.27× | 28.6 |
+| A6 | A5 without the random-forest tool | not recorded in time ([DEVIATIONS.md](DEVIATIONS.md) #1) | | | |
 
-- Primary test, A5 vs A2, the strongest baseline (pool-stratified permutation, one-sided): difference {{A5_A2_DIFF}}, p = {{A5_A2_P}}.
-- A5 vs A3 (random forest): difference {{A5_A3_DIFF}}, p = {{A5_A3_P}}.
-- Ceilings at 40 lookups: a perfect oracle finds {{ORACLE_HITS}} per pool on average; random expects {{RANDOM_HITS}} (40 × hits ÷ 500).
-- Calibration of the agent's P(hit): Brier {{BRIER}} over {{BRIER_N}} picks. Critic's visual reading of its own parity plot vs the computed Spearman: mean absolute error {{VISUAL_RHO_MAE}}.
-- Claim checker: {{CLAIMS_VERIFIED}} of {{CLAIMS_N}} numeric claims in agent reports verified, {{CLAIMS_FLAGGED}} flagged.
-- Leak probe (Glimmer ranks raw CSD refcodes with nothing else): AUC {{LEAK_AUC}}.
-- Physics honesty panel (never shown to the agent): MACE hit AUC {{MACE_AUC}} [{{MACE_AUC_LO}}, {{MACE_AUC_HI}}]; DFT at the starting geometry {{DFT_INIT_AUC}}.
+- Primary test, A5 vs A2, the strongest baseline (pool-stratified permutation, one-sided): difference -0.80, p = 1.000.
+- A5 vs A3 (random forest): difference +0.01, p = 0.527.
+- Ceilings at 40 lookups: a perfect oracle finds 14.00 per pool on average; random expects 1.12 (40 × hits ÷ 500).
+- Calibration of the agent's P(hit): Brier 0.087 over 200 picks. Critic's visual reading of its own parity plot vs the computed Spearman: mean absolute error 0.24.
+- Claim checker: 224 of 241 numeric claims in agent reports verified, 17 flagged.
+- Leak probe (Glimmer ranks raw CSD refcodes with nothing else): AUC 0.65, at the upper edge of the range chance gives (0.35–0.65), so slight recall of known materials cannot be ruled out. Ranking from composition and descriptors alone (L2): AUC 0.39, at chance.
+- Physics honesty panel (never shown to the agent): MACE hit AUC 0.49 [0.41, 0.56]; DFT at the starting geometry 0.65.
 
-With {{A5_N}} agent runs the intervals are wide, and we say so. Every number above links to its computation on the [results page](https://print-EddyMa.github.io/fortyshots/#/results).
+With 5 agent runs the intervals are wide, and we say so. Every number above links to its computation on the [results page](https://print-EddyMa.github.io/fortyshots/#/results).
 
 ## How it works
 
@@ -70,17 +85,17 @@ One model file serves every role. Reasoning cannot be switched off in Glimmer; i
 
 | | Value |
 |---|---|
-| Machine | MacBook Pro, Apple M4, 24 GB unified memory, {{MACOS_VERSION}} |
+| Machine | MacBook Pro, Apple M4, 24 GB unified memory, macOS 26.5.2 |
 | Model file | unsloth `Muse-Glimmer-30B-UD-Q3_K_XL.gguf` (13.36 GB) + Meta's `mmproj-Muse-Glimmer-30B-Q4_K_M.gguf` vision encoder (1.40 GB) + Meta's DFlash drafter `dflash-Muse-Glimmer-30B-Q4_K_M.gguf` (1.63 GB) |
 | sha256 (published by Hugging Face, checked by `./lab download` and recorded in every run header) | `820d18e00c59376331eba62dd716a6bcdcaa305c2316f5da3a2fab36c7c37e15` (model) |
-| llama.cpp | build {{LLAMA_BUILD}} (Homebrew), flags in [mac/profiles.json](mac/profiles.json) |
+| llama.cpp | build b11960-8642541b2 (Homebrew), flags in [mac/profiles.json](mac/profiles.json) |
 | Context | 32,768 tokens, 1 slot |
 | GPU memory limit | `sudo sysctl iogpu.wired_limit_mb=20480` (resets on reboot) |
-| Decode speed | {{TOKS}} tok/s (median over agent calls) |
-| Prompt speed | {{PREFILL_TOKS}} tok/s |
-| Memory while recording | {{MEM_GB}} GB used, swap growth {{SWAP_GB}} GB |
-| Minutes per A5 campaign | {{CAMPAIGN_MIN}} (median) |
-| DFlash drafter A/B | {{DFLASH_RESULT}} |
+| Decode speed | 6.3 tok/s (median over agent calls) |
+| Prompt speed | 32 tok/s |
+| Memory while recording | 22.3 GB used, swap growth 3.6 GB |
+| Minutes per A5 campaign | 52 (median) |
+| DFlash drafter A/B | 3.0 → 6.8 tok/s with Meta's DFlash drafter, 68% of drafted tokens accepted |
 | Live-demo profile | the same files with a 16K context |
 
 **Why this build.** `./lab bench` on this Mac (Oct 29, a ~2K-token agent prompt, `doctor/*-bench-*.json` on branch `runs-mac`):
@@ -104,14 +119,14 @@ The repository's first commit is tagged `hackathon-start` (Oct 29, 2026); there 
 
 | Component | Path | Built here | Commit range |
 |---|---|---|---|
-| ODAC23 extraction, hashed IDs, pools, labels | `physics/`, `data/` | yes | `hackathon-start`..{{FINAL_SHA}} |
+| ODAC23 extraction, hashed IDs, pools, labels | `physics/`, `data/` | yes | `hackathon-start`..c43f1f7 |
 | Research measurements behind the design (MACE, eqV2, Orb on ODAC configs) | `research/` | yes, Oct 29 | `hackathon-start` |
-| MACE cheap-oracle cache | `physics/`, `data/mace_cache.parquet` | yes | `hackathon-start`..{{FINAL_SHA}} |
-| Agent: roles, tools, ledger, cassettes, claim checker, mock server, live server | `fortyshots/` | yes | `hackathon-start`..{{FINAL_SHA}} |
-| Baselines, statistics, `verify` | `bench/` | yes | `hackathon-start`..{{FINAL_SHA}} |
-| Web console, results, gallery | `web/` → `docs/` | yes | `hackathon-start`..{{FINAL_SHA}} |
-| Mac runtime | `lab`, `mac/` | yes | `hackathon-start`..{{FINAL_SHA}} |
-| Recorded campaigns | `runs/` | yes, recorded Oct 30 – Nov 2 on the Mac | {{RUNS_RANGE}} |
+| MACE cheap-oracle cache | `physics/`, `data/mace_cache.parquet` | yes | `hackathon-start`..c43f1f7 |
+| Agent: roles, tools, ledger, cassettes, claim checker, mock server, live server | `fortyshots/` | yes | `hackathon-start`..c43f1f7 |
+| Baselines, statistics, `verify` | `bench/` | yes | `hackathon-start`..c43f1f7 |
+| Web console, results, gallery | `web/` → `docs/` | yes | `hackathon-start`..c43f1f7 |
+| Mac runtime | `lab`, `mac/` | yes | `hackathon-start`..c43f1f7 |
+| Recorded campaigns | `runs/` | yes, recorded Oct 30 – Nov 2 on the Mac | d6b475d..c43f1f7 |
 | Muse Glimmer weights, llama.cpp, ODAC23, MACE-MP-0, EquiformerV2, CoRE MOF, fonts and JS libraries | — | no, reused; see [PRIOR_WORK.md](PRIOR_WORK.md) | — |
 
 ## Reproduce
@@ -141,8 +156,8 @@ uv sync
 - **Known MOFs, not new discoveries.** Every candidate is an existing, published framework. A hit means the agent picked a framework whose label was already a hit; it does not mean a new sorbent was found.
 - **Humid air is a proxy.** "Binds CO2 more strongly than water" compares single-molecule binding energies. It says nothing about co-adsorption, kinetics, stability in water or cost at scale.
 - **Prospective mutants are unvalidated.** Agent-proposed variants are relaxed with ML potentials only, ranked by the surrogate, labelled "unvalidated · ML only", and never counted in any result.
-- **Small samples.** {{A5_N}} agent runs over 5 pools give wide intervals. The designers knew the aggregate MACE AUC before the freeze (disclosed in PREREG §10).
-- **Muse Glimmer failure modes** (disclosed per its Usage Policy, §4). The model can state numbers that no tool produced; the claim checker flags these and the count is published ({{CLAIMS_FLAGGED}} flagged). It can return malformed or empty output, especially when reasoning uses up the token budget; these are logged as errors and retried ({{SCHEMA_FAILURES}} schema failures). Its reading of plots can be wrong; we publish its error ({{VISUAL_RHO_MAE}}). It may recall published results; the leak probe measures this ({{LEAK_AUC}}). Quantization to 4 bits may change answers slightly compared with full precision. It is a planning aid for a researcher, not a replacement for one: recorded runs approve batches automatically and say so, and live runs ask a human.
+- **Small samples.** 5 agent runs over 5 pools give wide intervals. The designers knew the aggregate MACE AUC before the freeze (disclosed in PREREG §10).
+- **Muse Glimmer failure modes** (disclosed per its Usage Policy, §4). The model can state numbers that no tool produced; the claim checker flags these and the count is published (17 flagged). It can return malformed or empty output, especially when reasoning uses up the token budget; these are logged as errors and retried (16 schema failures). Its reading of plots can be wrong; we publish its error (0.24). It may recall published results; the leak probe measures this (0.65). Quantization to 4 bits may change answers slightly compared with full precision. It is a planning aid for a researcher, not a replacement for one: recorded runs approve batches automatically and say so, and live runs ask a human.
 
 ## Licenses
 

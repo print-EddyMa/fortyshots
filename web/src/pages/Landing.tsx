@@ -286,7 +286,7 @@ export function Landing() {
       <section className="wrap section">
         <div className="closing">
           <h2 className="h-section">
-            Open source. <span className="second">Every number can be checked.</span>
+            The AI decides what to test. <span className="second">Physics decides what&apos;s true.</span>
           </h2>
           <CommandPill cmd={`git clone ${repoPath}`} />
         </div>

@@ -1,18 +1,33 @@
 # fortyshots
 
-An offline AI lab that decides which expensive experiment to run next, and shows its work.
+**An AI scientist for materials discovery. It decides which experiments to run, learns from each result, and shows its work.**
 
-- **What it does.** Meta's open-weights **Muse Glimmer 30B** runs on a 24 GB MacBook and plays four roles (director, proposer, critic, reporter) in an agent that has 40 hidden-DFT lookups to find metal-organic frameworks (MOFs) that bind CO2 more strongly than water, out of a pool of 500.
-- **How it is scored.** The "experiments" are Meta FAIR's ODAC23 DFT labels, sealed until the agent pays for them. Every campaign is pre-registered ([PREREG.md](PREREG.md)) and compared with random choice and a random-forest active learner, with bootstrap confidence intervals.
-- **How it runs.** Fully local: llama.cpp `llama-server` on the Mac, no API key, no account, no cloud inference. `git clone` and `./lab verify` recompute every published number without a model.
+![Muse Glimmer 30B](https://img.shields.io/badge/Meta-Muse_Glimmer_30B-0866FF) ![DFlash](https://img.shields.io/badge/Meta-DFlash_speculative_decoding-0866FF) ![ODAC23](https://img.shields.io/badge/Meta_FAIR-Open_DAC_2023-0866FF) ![llama.cpp](https://img.shields.io/badge/runs_on-llama.cpp-555) ![pre-registered](https://img.shields.io/badge/pre--registered-prereg--v1-555) ![license](https://img.shields.io/badge/license-Apache--2.0-555)
 
-Site: https://print-EddyMa.github.io/fortyshots/ · Video: {{VIDEO_URL}} · Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon.
+**[Live site: watch a real campaign](https://print-EddyMa.github.io/fortyshots/)** · **[Demo video (3:00)]({{VIDEO_URL}})** · [Results](https://print-EddyMa.github.io/fortyshots/#/results) · [Pre-registration](PREREG.md)
+
+> The AI decides what to test. Physics decides what's true. Every number it writes is checked.
+
+![A real campaign in the console](web/screenshots/console-end-1440.png)
+*A real campaign on a test set: Muse Glimmer 30B picks ten materials per round with a stated confidence, critiques them by looking at the structures, and buys accurate simulations (DFT) one batch at a time.*
+
+**3-minute demo:** goal → plan → pick 10 with confidence → critique with vision → you approve → 10 simulations → learn → ×4 → cited report → proposed new materials
+
+> **Scope.** A research prototype, scored against existing DFT reference data. Its picks are among known materials, not new discoveries, and the materials it proposes are unvalidated. Every limitation is listed [below](#limitations).
+
+**Check every number with no model, no keys and no account:**
+
+```bash
+git clone https://github.com/print-EddyMa/fortyshots && cd fortyshots && ./lab verify
+```
+
+Built Oct 27 – Nov 4, 2026 for the Meta Global AI Developer Hackathon. To run the agent itself on a Mac, see [MAC_SETUP.md](MAC_SETUP.md).
 
 ---
 
 ## Results
 
-Status: **pilot** (filled from `results/results.json`; `./lab verify` recomputes it). Pre-registration: tag `prereg-v1`, sha256 `f5b216f38f4bd362fc93deb3f6a48d73e89a35fd7c40701e230299ba45c33638`.
+Status: **final** (filled from `results/results.json`; `./lab verify` recomputes it). Pre-registration: tag `prereg-v1`, sha256 `f5b216f38f4bd362fc93deb3f6a48d73e89a35fd7c40701e230299ba45c33638`.
 
 Headline (the rule in PREREG §9 decides its wording; it always names both baselines):
 > The Glimmer agent (A5) picked 1.40 hits in 40 lookups (95% CI 1.00–1.80) against 1.13 for random and 2.20 for the strongest baseline, greedy on the cheap simulator (MACE-greedy): it ties random, loses to MACE-greedy (difference -0.80, p = 1.000) and ties the random forest (RF-UCB, 1.39).
@@ -25,7 +40,7 @@ Headline (the rule in PREREG §9 decides its wording; it always names both basel
 | A3 | Random-forest active learner (RF-UCB) | 250 | 1.39 [1.17, 1.62] | 1.25× | 28.8 |
 | A4 | Glimmer, zero-shot (orders 40 at once) | 5 | 1.40 [1.00, 1.80] | 1.23× | 28.6 |
 | **A5** | **Glimmer agent, 4 rounds of 10** | 5 | 1.40 [1.00, 1.80] | 1.27× | 28.6 |
-| A6 | A5 without the random-forest tool | {{A6_N}} | {{A6_HITS}} [{{A6_LO}}, {{A6_HI}}] | {{A6_ENR}} | {{A6_LPH}} |
+| A6 | A5 without the random-forest tool | not recorded in time ([DEVIATIONS.md](DEVIATIONS.md) #1) | | | |
 
 - Primary test, A5 vs A2, the strongest baseline (pool-stratified permutation, one-sided): difference -0.80, p = 1.000.
 - A5 vs A3 (random forest): difference +0.01, p = 0.527.
