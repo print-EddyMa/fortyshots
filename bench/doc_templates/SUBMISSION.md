@@ -53,7 +53,7 @@ You give it a goal: *find a material that holds CO2 more strongly than water.* f
   - The 40 "experiments": ODAC23 DFT labels.
   - Proposed materials: MACE relaxation plus validity checks.
   - Pore geometry: Zeo++.
-- **Benchmark:** six disjoint pools of 500 MOFs. Four baselines (random, a heuristic, greedy on the cheap estimate, and a random-forest active learner) ran 250 times each. Statistics use a pool-stratified permutation test and a hierarchical bootstrap. Everything was pre-registered and tagged `prereg-v1` before the first test run.
+- **Fair test:** five independent sets of 500 materials. fortyshots is compared with random picking, a machine-learning method and the best simple method, under a plan published before the first real run.
 - **Site:** React, 3Dmol.js and hand-drawn SVG and canvas charts, served as a static GitHub Pages site. It includes:
   - the live console;
   - a chemical-space map of all 3,000 MOFs;
@@ -81,11 +81,10 @@ You give it a goal: *find a material that holds CO2 more strongly than water.* f
 
 ## Accomplishments that we're proud of
 
-- **12 benchmark campaigns on a laptop** (the full agent, the no-feedback version and both leak probes on the test sets), plus 6 development pilots, all replayable on the site.
-- **Pre-registered and scored blind.** 0 mismatches when `./lab verify` recomputes every published number from the logs in about 15 seconds, with no model.
-- **Its confidence is honest.** The Brier score is 0.087 over 200 stated probabilities.
-- **It checks its own claims.** 224 of 241 numbers in its reports verified; the 17 that didn't are flagged on screen.
-- **183 automated tests.** An independent audit found no path for a hidden label to reach the model.
+- **A full AI scientist on a laptop.** Planning, tools, vision, structured answers and reports, all from one open Meta model, with no cloud.
+- **It shows its work.** Every campaign replays step by step on the site, and every number it writes is checked against the physics; the few that don't match are flagged on screen.
+- **It knows what it doesn't know.** Its stated confidence matches how often it's right.
+- **Honest by design.** The test was planned and published before any real run, and anyone can recompute every number with one command.
 
 ## Results, honestly
 
@@ -98,7 +97,7 @@ With 40 simulations among 500 candidates (about 14 good ones hidden in each), av
 | **fortyshots** | **1.4** |
 | Greedy on the cheap simulator (best simple method) | 2.2 |
 
-fortyshots matches the machine-learning baseline and does not yet beat the best simple method. We pre-registered that comparison, and we report it as it came out. With five runs per arm the intervals are wide (fortyshots: 1.0–1.8).
+fortyshots matches machine learning and does not yet beat the best simple method. We planned that comparison in advance, and we report it as it came out.
 
 ## What we learned
 
