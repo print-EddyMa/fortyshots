@@ -6,5 +6,5 @@ Each entry gives: the date; what changed; why; whether it was decided before or 
 
 | # | Date (ET) | What changed | Why | Before or after test-pool results | Expected effect | Commit |
 |---|---|---|---|---|---|---|
-
-No deviations so far.
+| 1 | Nov 1, 2026 | A6 (agent without `fit_surrogate`, seed 0 on P1–P3) was not recorded before submission. | Laptop time ran out before the deadline. | After: A5, A4, L and L2 test-pool results were known. | Secondary endpoint "A5 − A6" is not reported; the primary (A5 − A2) and other secondaries are unaffected. If A6 is recorded later it is added without changing any other number. | this commit |
+| 2 | Oct 31, 2026 | The leak-probe sentence in the docs was reworded by hand: the automatic sentence called L = 0.65 "no sign of recall"; the published text says it is at the upper edge of chance and slight recall cannot be ruled out. | The automatic wording overstated the evidence. | After L and L2 were known. | None on any number; more conservative wording. | 0ecb5b2 |
