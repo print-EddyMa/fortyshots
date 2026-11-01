@@ -7,7 +7,6 @@ import { loadHero, type HeroData } from '../lib/chemData';
 import { SYMBOLS } from '../lib/chem';
 import { easeInOut, load3Dmol, reducedMotion } from '../lib/mol3d';
 import { num } from '../lib/format';
-import { Formula } from './Formula';
 import type { Structure } from '../lib/types';
 import '../styles/chem.css';
 
@@ -337,15 +336,12 @@ export function HeroMof() {
         )}
         {hero && (
           <figcaption className="specimen-cap mono">
-            <span className="specimen-id">
-              {hero.id} · <Formula f={hero.formula} /> · {hero.pool}
-            </span>
+            <span className="specimen-id">A real material from the test set</span>
             <span>
-              E<sub>CO2</sub> {num(hero.E_CO2, 2)} eV · E<sub>H2O</sub> {num(hero.E_H2O, 2)} eV <span className="faint">· DFT, ODAC23</span>
+              Holds CO<sub>2</sub> {num(hero.E_CO2 / hero.E_H2O, 0)}× more strongly than water
+              <span className="faint"> · accurate simulation (DFT), Meta FAIR Open DAC</span>
             </span>
-            <span className="faint specimen-legend">
-              2×2×{status === 'ready' && host.current && host.current.clientWidth < 640 ? 1 : 2} cells · surface: where a CO2 centre fits ({hero.pore.probe_A} Å probe) · LCD {num(hero.lcd_A, 1)} Å
-            </span>
+            <span className="faint specimen-legend">mesh: the pores where CO<sub>2</sub> fits · orange: CO<sub>2</sub></span>
           </figcaption>
         )}
       </div>

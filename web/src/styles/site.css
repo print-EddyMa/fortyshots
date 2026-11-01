@@ -693,3 +693,72 @@ main:focus {
   font-weight: 500;
   color: var(--fg);
 }
+
+/* Results: one big, plain answer */
+.bigbars {
+  display: grid;
+  gap: 14px;
+  margin: 8px 0 16px;
+}
+.bigbar {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 16px;
+}
+.bigbar-label {
+  font-size: 18px;
+  color: var(--fg-muted);
+}
+.bigbar-track {
+  height: 14px;
+  background: var(--bg-sunken);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.bigbar-fill {
+  display: block;
+  height: 100%;
+  background: var(--fg-faint);
+  border-radius: 9999px;
+  transition: width 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bigbar-val {
+  font-size: 28px;
+  text-align: right;
+  color: var(--fg-muted);
+}
+.bigbar.us .bigbar-label,
+.bigbar.us .bigbar-val {
+  color: var(--fg);
+}
+.bigbar.us .bigbar-fill {
+  background: var(--accent);
+}
+@media (max-width: 640px) {
+  .bigbar {
+    grid-template-columns: 1fr 56px;
+  }
+  .bigbar-track {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+.more-stats {
+  margin-top: 72px;
+  border-top: 1px solid var(--rule);
+  padding-top: 20px;
+}
+.more-stats > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 15px;
+  color: var(--fg);
+}
+.more-stats > summary::after {
+  content: " +";
+  color: var(--fg-muted);
+}
+.more-stats[open] > summary::after {
+  content: " −";
+}

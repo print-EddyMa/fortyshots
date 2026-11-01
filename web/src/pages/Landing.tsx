@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CommandPill, Page, Prelim } from '../components/Chrome';
-import { DiscoveryChart, type CurveSeries } from '../components/Charts';
 import { Console } from '../console/Console';
 import { HeroMof } from '../components/HeroMof';
 import { AtlasPlayer, type AtlasSeq } from '../components/Atlas';
@@ -8,7 +7,7 @@ import { loadAtlas, type AtlasData } from '../lib/chemData';
 import { derive } from '../lib/replay';
 import { REPO_URL } from '../lib/config';
 import { hasMockRuns, isPreliminary, loadEvents, pickShowcase } from '../lib/data';
-import { ci, num } from '../lib/format';
+import { num } from '../lib/format';
 import { href } from '../lib/router';
 import type { IndexEntry, Results, RunEvent } from '../lib/types';
 import { useIndex, useResults } from '../lib/useData';
@@ -143,14 +142,7 @@ export function Landing() {
   // The strongest non-LLM arm on these pools (PREREG H1 comparator), never a hand-picked one.
   const best = R?.arms.filter((x) => x.kind === 'baseline').reduce<typeof a0>((b, x) => (!b || x.hits_mean > b.hits_mean ? x : b), undefined);
   const prelim = isPreliminary(R, index.data);
-  const nA5 = a5?.n_runs;
 
-  const series: CurveSeries[] = [];
-  if (a0) series.push({ key: 'A0', label: 'Random', curve: a0.curve, lo: a0.curve_lo, hi: a0.curve_hi, tone: 'faint', band: true });
-  const a2 = arm('A2');
-  if (a2) series.push({ key: 'A2', label: 'Best existing', curve: a2.curve, tone: 'faint', dashed: true });
-  if (a3) series.push({ key: 'A3', label: 'Machine learning', curve: a3.curve, lo: a3.curve_lo, hi: a3.curve_hi, tone: 'muted', band: true });
-  if (a5) series.push({ key: 'A5', label: 'fortyshots', curve: a5.curve, lo: a5.curve_lo, hi: a5.curve_hi, tone: 'fg', band: true, width: 1.5 });
 
   return (
     <Page current="/">
@@ -210,24 +202,25 @@ export function Landing() {
             Full results <span aria-hidden>→</span>
           </a>
         </div>
-        <div className="answer">
-          <div className="answer-row">
-            <span className="answer-label">Random picks</span>
-            <span className="answer-val mono">{a0 ? num(a0.hits_mean, 1) : '—'}</span>
-          </div>
-          <div className="answer-row">
-            <span className="answer-label">Best existing method</span>
-            <span className="answer-val mono">{best ? num(best.hits_mean, 1) : '—'}</span>
-          </div>
-          <div className="answer-row answer-us">
-            <span className="answer-label">fortyshots</span>
-            <span className="answer-val mono">{a5 ? num(a5.hits_mean, 1) : '—'}</span>
-          </div>
+        <div className="bigbars">
+          {[
+            { label: 'Random picks', v: a0?.hits_mean },
+            { label: 'Machine learning', v: a3?.hits_mean },
+            { label: 'fortyshots', v: a5?.hits_mean, us: true },
+            { label: 'Best simple method', v: best?.hits_mean },
+          ].map((b) => (
+            <div key={b.label} className={`bigbar${b.us ? ' us' : ''}`}>
+              <span className="bigbar-label">{b.label}</span>
+              <span className="bigbar-track">
+                <span className="bigbar-fill" style={{ width: `${Math.min(100, ((b.v ?? 0) / 3) * 100)}%` }} />
+              </span>
+              <span className="bigbar-val mono">{b.v != null ? num(b.v, 1) : '—'}</span>
+            </div>
+          ))}
         </div>
         <p className="small muted">
-          Good materials found in 40 tests among 500 candidates. Scored blind.
-          {a5 ? ` ${nA5} runs, 95% interval ${ci(a5.hits_ci[0], a5.hits_ci[1])}.` : ' fortyshots runs are being recorded.'}{' '}
-          <a href={href('/method')}>Method</a>
+          Good materials found with 40 tests among 500 candidates, scored blind.{' '}
+          <a href={href('/results')}>See how</a>
         </p>
       </section>
 
@@ -268,20 +261,6 @@ export function Landing() {
         </div>
       </section>
 
-      {series.length > 0 && (
-        <section className="wrap section">
-          <div className="section-head">
-            <h2 className="label">Progress per test</h2>
-            <a className="link-quiet label" href={href('/results')}>
-              All results <span aria-hidden>→</span>
-            </a>
-          </div>
-          <p className="section-lede">
-            Good materials found as tests are spent. {R ? num(R.base_rate * 100, 1) : '—'}% of candidates qualify.
-          </p>
-          <DiscoveryChart series={series} height={300} labelWidth={150} title="Mean hits against DFT lookups for the agent and baselines" />
-        </section>
-      )}
 
       <section className="wrap section">
         <div className="closing">

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HitWord, Page, Prelim, Stat } from '../components/Chrome';
+import { HitWord, Page, Prelim } from '../components/Chrome';
 import { ArmsChart, DiscoveryChart, ReliabilityChart, ScatterChart, type CurveSeries } from '../components/Charts';
 import { curveOf, meanHits, pick, type BaselineArm } from '../lib/baselines';
 import { hasMockRuns, isPreliminary, loadEvents } from '../lib/data';
-import { ARM_LABEL, ci, count, num, shortSha } from '../lib/format';
+import { ARM_LABEL, ci, num, shortSha } from '../lib/format';
 import { href } from '../lib/router';
 import { derive } from '../lib/replay';
 import type { IndexEntry, PoolRow, Pools, Results, RunEvent } from '../lib/types';
@@ -233,8 +233,6 @@ export function ResultsPage() {
   const a3 = arm('A3');
   const a2 = arm('A2');
   const a0 = arm('A0');
-  const a5runs = (index.data ?? []).filter((r) => r.arm === 'A5' && r.duration_s != null);
-  const minutes = a5runs.length ? a5runs.reduce((s, r) => s + (r.duration_s ?? 0), 0) / a5runs.length / 60 : null;
   const prelim = isPreliminary(R, index.data);
   const order = ['A5', 'A6', 'A4', 'A3', 'A2', 'A1', 'A0'];
   const armsSorted = [...R.arms].sort((a, b) => order.indexOf(a.arm) - order.indexOf(b.arm));
@@ -260,26 +258,36 @@ export function ResultsPage() {
     <Page current="/results">
       <section className="wrap page-head">
         <h1 className="h-section">
-          <span>Results.</span>
-          <span className="second">Scored blind against the best existing methods.</span>
+          <span>Does it work?</span>
+          <span className="second">We tested it fairly, blind.</span>
         </h1>
         <p className="lede">
-          40 tests, 500 candidates, five independent sets. Every number reproduces with <span className="mono">./lab verify</span>.
+          Each method gets 40 tests to find the good CO2 capturers hidden among 500 materials.
         </p>
         {prelim && <Prelim status={R.status} mockRuns={hasMockRuns(index.data)} />}
       </section>
 
       <section className="wrap">
-        <div className="stats">
-          <Stat label="fortyshots" value={num(a5?.hits_mean, 1)} unit="/ 40" sub={a5 ? `95% CI ${ci(a5.hits_ci[0], a5.hits_ci[1])}, n = ${a5.n_runs} runs` : undefined} />
-          <Stat label="vs. random" value={num(a5?.enrichment, 1)} unit="×" sub={`base rate ${num(R.base_rate * 100, 1)}%`} />
-          <Stat label="Best existing method" value={num(a2?.hits_mean, 1)} unit="/ 40" sub={a2 ? `MACE-greedy · RF-UCB: ${num(a3?.hits_mean, 2)}` : undefined} />
-          <Stat label="Random picks" value={num(a0?.hits_mean, 1)} unit="/ 40" sub={a0 ? `95% CI ${ci(a0.hits_ci[0], a0.hits_ci[1])}, n = ${a0.n_runs}` : undefined} />
-          <Stat label="Confidence accuracy" value={num(R.calibration?.brier, 3)} sub={R.calibration ? `Brier score over ${R.calibration.n} predictions; lower is better` : 'not available yet'} />
-          <Stat label="Verified claims" value={R.claims ? R.claims.verified : '—'} unit={R.claims ? `/ ${R.claims.n}` : undefined} sub={R.claims ? `${R.claims.flagged} flagged by the claim checker` : undefined} />
-          <Stat label="Tests to first find" value={num(a5?.first_hit_mean, 1)} sub={a0 ? `random: ${num(a0.first_hit_mean, 1)}` : undefined} />
-          <Stat label="Minutes per search" value={num(minutes, 1)} unit="min" sub={a5runs.length ? `mean of ${a5runs.length} runs on the laptop` : undefined} />
+        <div className="bigbars">
+          {[
+            { label: 'Random picks', v: a0?.hits_mean },
+            { label: 'Machine learning', v: a3?.hits_mean },
+            { label: 'fortyshots', v: a5?.hits_mean, us: true },
+            { label: 'Best simple method', v: a2?.hits_mean },
+          ].map((b) => (
+            <div key={b.label} className={`bigbar${b.us ? ' us' : ''}`}>
+              <span className="bigbar-label">{b.label}</span>
+              <span className="bigbar-track">
+                <span className="bigbar-fill" style={{ width: `${Math.min(100, ((b.v ?? 0) / 3) * 100)}%` }} />
+              </span>
+              <span className="bigbar-val mono">{b.v != null ? num(b.v, 1) : '—'}</span>
+            </div>
+          ))}
         </div>
+        <p className="fig-sub">
+          Good materials found, averaged over five sets. fortyshots matches machine learning, not yet the best simple method, and
+          every claim it makes is checked against the physics.
+        </p>
       </section>
 
       <section className="wrap section">
@@ -297,11 +305,11 @@ export function ResultsPage() {
               </p>
               <ScatterChart
                 points={rows.map((r) => ({ x: r.E_H2O, y: r.E_CO2, strong: r.hit, id: r.id }))}
-                xLabel="E water (eV)"
-                yLabel="E CO2 (eV)"
+                xLabel="Water binding (eV)"
+                yLabel="CO2 binding (eV)"
                 height={360}
                 ariaLabel={`CO2 versus water binding energy for ${rows.length} MOFs, ${hits} hits`}
-                annotation={`n = ${rows.length.toLocaleString()} MOFs · ${hits} hits (${num((100 * hits) / rows.length, 1)}%) · water binds more strongly in ${num(waterWins * 100, 0)}% · dashed: equal binding · ODAC23 DFT`}
+                annotation={`${rows.length.toLocaleString()} materials · ${hits} good ones`}
               />
               </>
             );
@@ -314,8 +322,7 @@ export function ResultsPage() {
       <section className="wrap section" id="metals">
         <h2 className="fig-title">Best metals</h2>
         <p className="fig-sub">
-          Every metal in the six pools, coloured by the share of MOFs containing it that are DFT hits. Each cell: MOFs with that metal ·
-          hits. The agent sees the metals; it does not see this table.
+          Darker means more of the materials with that metal capture CO2 well.
         </p>
         {pools.data ? (
           <PeriodicTable rows={Object.values(pools.data.pools).flat()} label="Periodic table of DFT hit rates by metal" />
@@ -324,6 +331,8 @@ export function ResultsPage() {
         )}
       </section>
 
+      <details className="wrap more-stats">
+        <summary className="label">Full statistics</summary>
       <section className="wrap section">
         <div className="split">
           <div>
@@ -520,11 +529,8 @@ export function ResultsPage() {
         <p className="fig-sub">From the ledger of each Glimmer agent run.</p>
         {index.data && pools.data ? <HitsAndMisses index={index.data} pools={pools.data} /> : <p className="muted">Loading…</p>}
       </section>
-      <section className="wrap">
-        <p className="small" style={{ marginTop: 48 }}>
-          results.json generated {R.generated} · status {R.status} · {count(R.arms.reduce((s, a) => s + a.n_runs, 0))} campaigns in total.
-        </p>
-      </section>
+      </details>
+
     </Page>
   );
 }

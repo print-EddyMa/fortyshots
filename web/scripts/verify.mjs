@@ -136,6 +136,7 @@ for (const vp of [
 {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`${base}#/results`, { waitUntil: 'networkidle' });
+  await page.click('.more-stats > summary');  // the re-roll lives in the collapsed full statistics
   await page.waitForSelector('#seed');
   await page.fill('#seed', '1234');
   const t = await page.evaluate(async () => {
