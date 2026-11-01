@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>loop: the agent loop</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="data.js"></script>
+<script src="scene.js"></script>
+</head>
+<body>
+<script>
+// The agent loop: Plan -> Pick -> Check -> Test -> Learn, four rounds of ten tests (fortyshots/config.py:
+// ROUNDS, BATCH, BUDGET via results.json budget). One model, Muse Glimmer 30B, plays every role; the Test step is
+// physics (DFT results from ODAC23), drawn square and fed by no spoke. Laid out for 1920x1080; in a portrait
+// window the same drawing is scaled to fit.
+const { el, set, text, headline, C, clamp, lerp, ease, tw, win } = Scene;
+const NODES = [
+  { key: 'Plan', role: 'Director', desc: ['explores the pool with tools'] },
+  { key: 'Pick', role: 'Proposer', desc: ['10 picks, a confidence', 'for each'] },
+  { key: 'Check', role: 'Critic', desc: ['vision: looks at', 'structures and charts'] },
+  { key: 'Test', role: 'DFT simulation', desc: ['physics gives the answer'], physics: true },
+  { key: 'Learn', role: 'Director', desc: ['checks its simulator,', 'adjusts the plan'] },
+];
+const T0 = 0.9;
+const ROUND_DUR = [1.9, 1.5, 1.3, 1.2];
+
+Scene.run({
+  duration: 8,
+  build(ctx) {
+    const { svg, W, H, portrait, data } = ctx;
+    const root = el('g', {}, svg);
+    if (portrait) set(root, { transform: `translate(0 ${(H - 1080 * (W / 1920)) / 2}) scale(${W / 1920})` });
+    ctx.D = data.loop;
+    const cx = 1230;
+    const cy = 545;
+    const R = 285;
+    ctx.geo = { cx, cy, R };
+    ctx.head = headline(root, [[['One model. Four roles.', false]], [['Four rounds of ten tests.', true]]], 120, 150, 62);
+
+    // the ring and its direction marks
+    el('circle', { cx, cy, r: R, fill: 'none', stroke: C.ruleStrong, 'stroke-width': 2 }, root);
+    ctx.trail = el('circle', { cx, cy, r: R, fill: 'none', stroke: C.accent, 'stroke-width': 3, transform: `rotate(-90 ${cx} ${cy})`, 'stroke-dasharray': `0 ${2 * Math.PI * R}` }, root);
+    const P = (deg, r = R) => [cx + r * Math.sin((deg * Math.PI) / 180), cy - r * Math.cos((deg * Math.PI) / 180)];
+    for (let k = 0; k < 5; k++) {
+      const a = k * 72 + 36;
+      const [x, y] = P(a);
+      el('path', { d: 'M -7 -9 L 5 0 L -7 9', fill: 'none', stroke: C.muted, 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', transform: `translate(${x} ${y}) rotate(${a})` }, root);
+    }
+    // spokes from the model to every AI role
+    ctx.spokes = [];
+    NODES.forEach((n, k) => {
+      if (n.physics) return;
+      const [x, y] = P(k * 72, R - 70);
+      const [x0, y0] = P(k * 72, 118);
+      ctx.spokes.push(el('line', { x1: x0, y1: y0, x2: x, y2: y, stroke: C.muted, 'stroke-width': 1.5, 'stroke-dasharray': '3 7' }, root));
+    });
+    // centre: the one model
+    ctx.center = el('g', {}, root);
+    text(ctx.center, 'Muse Glimmer 30B', cx, cy - 4, 34, { anchor: 'middle' });
+    text(ctx.center, 'one model, every role', cx, cy + 34, 21, { mono: true, fill: C.muted, anchor: 'middle' });
+
+    ctx.pulse = el('circle', { r: 11, fill: C.accent }, root);
+    // nodes
+    ctx.nodes = NODES.map((n, k) => {
+      const [x, y] = P(k * 72);
+      const g = el('g', {}, root);
+      const shape = n.physics
+        ? el('rect', { x: x - 58, y: y - 58, width: 116, height: 116, rx: 10, fill: C.bg, stroke: C.fg, 'stroke-width': 2.5 }, g)
+        : el('circle', { cx: x, cy: y, r: 62, fill: C.bg, stroke: C.fg, 'stroke-width': 2.5 }, g);
+      const label = text(g, n.key, x, y + 11, 32, { anchor: 'middle' });
+      // role label outside the ring
+      const side = Math.abs(x - cx) < 10 ? 'top' : x > cx ? 'right' : 'left';
+      const lx = side === 'top' ? x : side === 'right' ? x + 86 : x - 86;
+      const ly = side === 'top' ? y - 118 : y - 12;
+      const anchor = side === 'left' ? 'end' : side === 'top' ? 'middle' : 'start';
+      const lab = el('g', {}, root);
+      text(lab, n.role, lx, ly, 28, { anchor, fill: n.physics ? C.accent : C.fg });
+      n.desc.forEach((d, i) => text(lab, d, lx, ly + 33 + i * 28, 23, { mono: true, fill: C.muted, anchor }));
+      return { g, shape, label, lab, x, y };
+    });
+
+    // counter
+    ctx.count = text(root, '0', 112, 650, 240, {});
+    text(root, 'tests used', 120, 720, 38, { fill: C.faint });
+    ctx.roundTxt = text(root, '', 120, 775, 24, { mono: true, fill: C.muted });
+    ctx.P = P;
+  },
+  update(t, ctx) {
+    const { geo, D } = ctx;
+    set(ctx.head, { opacity: win(t, 0, Infinity, 0.4) });
+    set(ctx.center, { opacity: tw(t, 0.3, 0.8, ease.out) });
+    ctx.spokes.forEach((s, i) => set(s, { opacity: tw(t, 0.5 + i * 0.08, 0.9 + i * 0.08) }));
+    // where is the pulse?
+    let r = -1;
+    let u = 0;
+    let acc = T0;
+    for (let k = 0; k < ROUND_DUR.length; k++) {
+      if (t >= acc && t < acc + ROUND_DUR[k]) {
+        r = k;
+        u = (t - acc) / ROUND_DUR[k];
+      }
+      acc += ROUND_DUR[k];
+    }
+    const done = t >= acc;
+    if (done) {
+      r = ROUND_DUR.length - 1;
+      u = 1;
+    }
+    const deg = 360 * u;
+    const [px, py] = ctx.P(deg);
+    set(ctx.pulse, { cx: px, cy: py, opacity: t >= T0 && !done ? 1 : 0 });
+    const circ = 2 * Math.PI * geo.R;
+    set(ctx.trail, { 'stroke-dasharray': `${(done ? 0 : u * circ).toFixed(1)} ${circ}`, opacity: t >= T0 ? 1 : 0 });
+
+    ctx.nodes.forEach((n, k) => {
+      const appear = tw(t, 0.1 + k * 0.1, 0.5 + k * 0.1, ease.back);
+      // highlight while the pulse sits on this node (within +-14 deg)
+      let d = Math.abs(((deg - k * 72 + 540) % 360) - 180);
+      const on = t >= T0 && !done ? clamp(1 - d / 16) : 0;
+      set(n.g, { opacity: appear, transform: `translate(${n.x} ${n.y}) scale(${(0.6 + 0.4 * appear) * (1 + 0.08 * on)}) translate(${-n.x} ${-n.y})` });
+      const physics = NODES[k].physics;
+      set(n.shape, { fill: on > 0.4 ? (physics ? C.accent : C.fg) : C.bg, stroke: physics && on > 0.4 ? C.accent : C.fg });
+      set(n.label, { fill: on > 0.4 ? C.bg : C.fg });
+      set(n.lab, { opacity: tw(t, 0.3 + k * 0.1, 0.7 + k * 0.1, ease.out) });
+    });
+    // tests used: +batch each time the pulse passes Test (u = 0.6)
+    let used = 0;
+    if (r >= 0) used = r * D.batch + (u >= 0.6 ? D.batch : 0);
+    set(ctx.count, { text: String(Math.min(D.budget, used)) });
+    set(ctx.roundTxt, { text: r >= 0 ? `round ${r + 1} of ${D.rounds}` : '' });
+  },
+});
+</script>
+</body>
+</html>

@@ -16,8 +16,14 @@
 //
 // Everything is driven by the run's ledger (events.jsonl), never by fixed sequence numbers or run ids, so the
 // same script works when real runs replace the fixtures.
+//
+// Explainer scenes (scenes/*.html: humidity, bottleneck, loop, split, dflash, result) are shots too. They are
+// pure functions of time (scenes/scene.js), so instead of a screen recording each frame is rendered at an exact
+// t and piped to ffmpeg at 30 fps: the same clip every time, with no dropped frames. Their numbers come from
+// scenes/data.py, which runs first. Stills for checking a scene without recording it:
+//   node web/scripts/video/record-broll.mjs --only humidity,result --stills 1,4.5,9   -> media/scene-stills/*.png
 import { createServer } from 'node:http';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +40,8 @@ const DOCS = resolve(ROOT, arg('--docs', 'docs'));
 const OUT = resolve(ROOT, arg('--out', 'media/broll'));
 const ONLY = (arg('--only', '') || '').split(',').filter(Boolean);
 const FORMAT = arg('--format', 'both'); // desktop | mobile | both
+const STILLS = (arg('--stills', '') || '').split(',').filter(Boolean).map(Number);
+const SCENES = join(HERE, 'scenes');
 const VERBOSE = process.argv.includes('--verbose');
 
 // ------------------------------------------------------------------------------------------- formats
@@ -270,6 +278,11 @@ const server = createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' });
     return res.end(cardHtml(u.searchParams.get('k')));
   }
+  if (u.pathname === '/__scenes/fonts.css') {
+    res.writeHead(200, { 'content-type': 'text/css', 'cache-control': 'no-cache' });
+    return res.end(fontFaces());
+  }
+  if (u.pathname.startsWith('/__scenes/')) return serveStatic(SCENES, { url: req.url.replace('/__scenes', '') }, res);
   if (u.pathname === '/__broll.html') {
     const base = FORMATS[u.searchParams.get('f')] ?? FORMATS.desktop;
     const vw = Number(u.searchParams.get('vw')) || base.vw;
@@ -524,6 +537,52 @@ async function makeShot(browser, fmt, opts = {}) {
   return s;
 }
 
+// ------------------------------------------------------------------------------------------- scenes
+// Frame-exact capture of a scene page: seek(t) for every frame, screenshot, pipe PNGs to ffmpeg (H.264, CRF 12).
+async function openScene(browser, fmt, id) {
+  const f = FORMATS[fmt];
+  const ctx = await browser.newContext({ viewport: { width: f.out[0], height: f.out[1] }, deviceScaleFactor: 1, colorScheme: 'dark' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  await page.goto(`${BASE}__scenes/${id}.html?capture=1`, { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => window.__scene && window.__scene.ready, null, { timeout: 30000 });
+  return { ctx, page, errors, f };
+}
+async function sceneStills(browser, fmt, shot) {
+  const dir = join(ROOT, 'media', 'scene-stills');
+  mkdirSync(dir, { recursive: true });
+  const { ctx, page, errors } = await openScene(browser, fmt, shot.id);
+  const files = [];
+  for (const t of STILLS) {
+    await page.evaluate((t) => window.__scene.seek(t), t);
+    const file = join(dir, `${shot.id}-${FORMATS[fmt].tag}-t${t.toFixed(2)}.png`);
+    await page.screenshot({ path: file });
+    files.push(relative(ROOT, file));
+  }
+  await ctx.close();
+  console.log(`[broll] stills ${shot.id} ${fmt}: ${files.join(' ')}${errors.length ? `  page errors: ${errors.join(' | ')}` : ''}`);
+}
+async function recordScene(browser, fmt, shot, file) {
+  const FPS = 30;
+  const { ctx, page, errors } = await openScene(browser, fmt, shot.id);
+  const duration = await page.evaluate(() => window.__scene.duration);
+  const n = Math.round(duration * FPS);
+  const ff = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'image2pipe', '-c:v', 'png', '-framerate', String(FPS), '-i', '-',
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '12', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-movflags', '+faststart', file], { stdio: ['pipe', 'inherit', 'inherit'] });
+  const done = new Promise((res, rej) => ff.on('close', (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exited ${c}`)))));
+  for (let i = 0; i < n; i++) {
+    await page.evaluate((t) => window.__scene.seek(t), i / FPS);
+    const png = await page.screenshot({ type: 'png' });
+    if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once('drain', r));
+  }
+  ff.stdin.end();
+  await done;
+  await ctx.close();
+  return { usable: n / FPS, errors, marks: { in: 0, ...(shot.marks ?? {}) } };
+}
+
 // ------------------------------------------------------------------------------------------- shots
 const consoleHash = (q = '') => `#/console/${encodeURIComponent(RUN)}${q ? `?${q}` : ''}`;
 const hasEvent = (i) => i >= 0;
@@ -670,7 +729,7 @@ const SHOTS = [
       await s.frame.goto(`${BASE}__card.html?k=close`, { waitUntil: 'networkidle' });
       await s.frame.evaluate(() => document.fonts.ready);
       s.start();
-      await s.hold(11000);
+      await s.hold(17000);
     },
   },
   {
@@ -1005,6 +1064,64 @@ const SHOTS = [
       await s.hold(14000);
     },
   },
+  // ---------------------------------------------------------------- explainer scenes (scenes/*.html)
+  {
+    id: 'humidity',
+    scene: true,
+    storyboard: '0:10–0:24 (The problem, first half)',
+    xclip: '4–10 s',
+    speed: 1,
+    marks: { water: 2.0, good: 6.4 },
+    desc: 'Scene: a pore with one metal site; water takes the site before CO2 (85% of 3,000 MOFs), then in the hero MOF CO2 holds on. Bars: DFT binding strength.',
+  },
+  {
+    id: 'bottleneck',
+    scene: true,
+    storyboard: '0:10–0:24 (The problem, second half)',
+    xclip: null,
+    speed: 1,
+    marks: { pool: 1.2, picks: 2.7, reveal: 5.1 },
+    desc: "Scene: the atlas's 3,000 MOFs collapse to one search of 500; 40 affordable tests light up; the run's hit flashes, then the hidden good ones show.",
+  },
+  {
+    id: 'loop',
+    scene: true,
+    formats: ['desktop'], // main video only
+    storyboard: '0:52–1:40 (Watch it work, first ~6 s)',
+    xclip: null,
+    speed: 1,
+    marks: {},
+    desc: 'Scene: the agent loop Plan, Pick, Check, Test, Learn, four rounds; one model (Muse Glimmer 30B) behind every role; tests used 0 to 40.',
+  },
+  {
+    id: 'dflash',
+    scene: true,
+    formats: ['desktop'],
+    storyboard: '0:24–0:42 (What it runs on, last ~6 s)',
+    xclip: null,
+    speed: 1,
+    marks: {},
+    desc: "Scene: Meta's DFlash speculative decoding at real speed: the drafter guesses tokens, the 30B model checks them in one pass; same text, 3.0 vs 6.8 tok/s.",
+  },
+  {
+    id: 'result',
+    scene: true,
+    storyboard: '1:58 (The honest result)',
+    xclip: '30–40 s',
+    speed: 1,
+    marks: { bars: 0.8 },
+    desc: 'Scene: hits at 40 tests, blind: random, the machine-learning baseline, fortyshots (accent) and the best simple method, with faint 95% intervals.',
+  },
+  {
+    id: 'split',
+    scene: true,
+    formats: ['desktop'],
+    storyboard: '2:16 (The principle)',
+    xclip: null,
+    speed: 1,
+    marks: {},
+    desc: "Scene: the principle card. The AI decides what to test (it sends picks); physics decides what's true (results come back checked).",
+  },
 ];
 
 // ------------------------------------------------------------------------------------------- main
@@ -1017,6 +1134,10 @@ function ffprobeDuration(file) {
 }
 
 mkdirSync(OUT, { recursive: true });
+if (SHOTS.some((x) => x.scene && (!ONLY.length || ONLY.includes(x.id)))) {
+  // the scenes' numbers, fresh from the result files
+  console.log('[broll] ' + execFileSync('python3', [join(SCENES, 'data.py')]).toString().trim());
+}
 const manifestPath = join(OUT, 'shots.json');
 const prev = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
 const keepPrev = prev && prev.run_id === RUN && ONLY.length > 0;
@@ -1055,6 +1176,24 @@ for (const shot of SHOTS) {
   delete entry.skipped;
   for (const fmt of fmts) {
     const t = Date.now();
+    if (shot.formats && !shot.formats.includes(fmt)) continue;
+    if (shot.scene) {
+      if (STILLS.length) {
+        await sceneStills(browser, fmt, shot);
+        continue;
+      }
+      const file = `${shot.id}-${FORMATS[fmt].tag}.mp4`;
+      try {
+        const r = await recordScene(browser, fmt, shot, join(OUT, file));
+        entry[fmt] = { file, trim_in: 0, duration: +r.usable.toFixed(2), file_duration: ffprobeDuration(join(OUT, file)), marks: r.marks, size: FORMATS[fmt].out };
+        if (r.errors.length) entry[fmt].page_errors = r.errors.slice(0, 5);
+        console.log(`[broll] ${shot.id.padEnd(17)} ${fmt.padEnd(7)} ${file.padEnd(34)} usable ${r.usable.toFixed(1).padStart(5)} s  (${((Date.now() - t) / 1000).toFixed(0)} s wall, frame-exact)${r.errors.length ? `  page errors: ${r.errors.length}` : ''}`);
+      } catch (err) {
+        failures++;
+        console.error(`[broll] FAILED ${shot.id} ${fmt}: ${err?.message ?? err}`);
+      }
+      continue;
+    }
     const s = await makeShot(browser, fmt, { zoom: shot.zoom, vw: shot.vw, focus: shot.focus });
     let result;
     try {
@@ -1095,6 +1234,6 @@ for (const shot of SHOTS) {
 await browser.close();
 server.close();
 rmSync(join(OUT, '.tmp'), { recursive: true, force: true });
-writeFileSync(manifestPath, JSON.stringify(manifest, null, 1));
-console.log(`[broll] wrote ${relative(ROOT, manifestPath)}${failures ? `; ${failures} recording(s) failed` : ''}`);
+if (!STILLS.length) writeFileSync(manifestPath, JSON.stringify(manifest, null, 1));
+if (!STILLS.length) console.log(`[broll] wrote ${relative(ROOT, manifestPath)}${failures ? `; ${failures} recording(s) failed` : ''}`);
 process.exit(failures ? 1 : 0);

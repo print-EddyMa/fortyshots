@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>dflash: Meta's DFlash speculative decoding</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="data.js"></script>
+<script src="scene.js"></script>
+</head>
+<body>
+<script>
+// Meta's DFlash speculative decoding, at real speed. Both rows write the same text (the model's own reasoning
+// from the showcase run, one word drawn per token for legibility). Top: Muse Glimmer 30B alone at the measured
+// 3.0 tokens/s. Bottom: with the DFlash drafter at the measured 6.8 tokens/s: each step the drafter guesses the
+// next 3 tokens (this llama.cpp build: block_size 16, n_max 3 drafted per step), the 30B model checks them all in
+// one pass, keeps the ones it agrees with and writes its own token where it disagrees (or one more when all 3
+// were right). So every word on screen is the 30B model's own choice: same output, faster. The accept/reject
+// pattern here is illustrative (25 of 36 drafts kept, about the measured 68%); the speeds are measured
+// (README "DFlash drafter A/B", doctor/*-bench-*.json on branch runs-mac).
+const { el, set, text, headline, C, clamp, lerp, ease, tw, win, hash } = Scene;
+const K = [3, 2, 2, 3, 1, 2, 3, 2, 0, 3, 2, 2]; // drafts accepted per step (of 3)
+const WRONG = ['the', 'a', 'more', 'and', 'then', 'it', 'one', 'for', 'some', 'with', 'all', 'so'];
+const FS = 34;
+const LH = 50;
+const T_START = 0.7;
+
+Scene.run({
+  duration: 8,
+  build(ctx) {
+    const { svg, W, H, portrait, data } = ctx;
+    const D = data.dflash;
+    const root = el('g', {}, svg);
+    if (portrait) set(root, { transform: `translate(0 ${(H - 1080 * (W / 1920)) / 2}) scale(${W / 1920})` });
+    ctx.D = D;
+    ctx.head = headline(root, [[["Meta's DFlash: a small model drafts,", false]], [['the big one checks.', true]]], 120, 150, 62);
+
+    // word layout (same for both rows)
+    const cv = document.createElement('canvas').getContext('2d');
+    cv.font = `400 ${FS}px Geist`;
+    const BOX_W = 1180;
+    const words = D.words;
+    const pos = [];
+    let x = 0;
+    let line = 0;
+    const space = cv.measureText(' ').width;
+    for (const w of words) {
+      const ww = cv.measureText(w).width;
+      if (x > 0 && x + ww > BOX_W) {
+        x = 0;
+        line++;
+      }
+      pos.push({ x, line, w: ww });
+      x += ww + space;
+    }
+    ctx.pos = pos;
+    ctx.measure = (w) => cv.measureText(w).width;
+
+    // steps of the speculative row
+    const meanEmit = K.reduce((a, k) => a + k + 1, 0) / K.length;
+    const T = meanEmit / D.dflash_tps;
+    const steps = [];
+    let done = 0;
+    for (let p = 0; done < words.length; p++) {
+      const k = K[p % K.length];
+      steps.push({ t0: T_START + p * T, k, from: done });
+      done += k + 1;
+    }
+    ctx.steps = steps;
+    ctx.T = T;
+
+    const mkRow = (y, label, rate, accent) => {
+      const g = el('g', {}, root);
+      text(g, label, 120, y, 30, {});
+      text(g, `${rate.toFixed(1)} tokens/s`, 120 + BOX_W, y, 24, { mono: true, fill: accent ? C.accent : C.muted, anchor: 'end' });
+      el('line', { x1: 120, y1: y + 18, x2: 120 + BOX_W, y2: y + 18, stroke: C.rule, 'stroke-width': 1 }, g);
+      const clipId = `clip${y}`;
+      const cp = el('clipPath', { id: clipId }, root);
+      el('rect', { x: 100, y: y + 30, width: BOX_W + 60, height: LH * 3 + 14 }, cp);
+      const body = el('g', { 'clip-path': `url(#${clipId})` }, g);
+      const inner = el('g', {}, body);
+      const ws = words.map((w, i) => text(inner, w, 120 + pos[i].x, y + 30 + 38 + pos[i].line * LH, FS, { weight: 400, fill: C.fg, ls: '0px' }));
+      ws.forEach((e) => set(e, { opacity: 0 }));
+      return { g, inner, ws, y0: y + 30 + 38 };
+    };
+    ctx.rowA = mkRow(300, 'Muse Glimmer 30B alone', D.base_tps, false);
+    ctx.rowB = mkRow(560, "with Meta's DFlash drafter", D.dflash_tps, true);
+    // cursor for row A
+    ctx.cursor = el('rect', { width: 3, height: FS, fill: C.fg }, ctx.rowA.inner);
+    // ghosts (drafted guesses), strike-through and the 30B's own word underline, in row B
+    ctx.ghosts = [0, 1, 2].map(() => {
+      const g = el('g', {}, ctx.rowB.inner);
+      const tx = text(g, '', 0, 0, FS, { weight: 400, fill: C.muted, ls: '0px' });
+      const ul = el('line', { 'stroke-dasharray': '5 5', stroke: C.muted, 'stroke-width': 2 }, g);
+      const st = el('line', { stroke: C.muted, 'stroke-width': 2.5 }, g);
+      return { g, tx, ul, st };
+    });
+    ctx.sweep = el('rect', { width: 4, height: LH, fill: C.accent }, ctx.rowB.inner);
+    ctx.own = el('line', { stroke: C.accent, 'stroke-width': 3 }, ctx.rowB.inner);
+
+    // the one number
+    const sx = 1440;
+    ctx.stat = el('g', {}, root);
+    text(ctx.stat, `${D.speedup}×`, sx - 8, 480, 210, {});
+    text(ctx.stat, 'faster', sx, 545, 46, { fill: C.fg });
+    text(ctx.stat, 'same answers', sx, 600, 46, { fill: C.faint });
+    // legend
+    const lg = el('g', {}, root);
+    ctx.legend = lg;
+    const ly = 690;
+    text(lg, 'guess', sx, ly, 24, { mono: true, fill: C.muted });
+    el('line', { x1: sx, y1: ly + 9, x2: sx + 72, y2: ly + 9, stroke: C.muted, 'stroke-width': 2, 'stroke-dasharray': '5 5' }, lg);
+    text(lg, 'kept by the 30B model', sx + 100, ly, 24, { mono: true, fill: C.fg });
+    el('rect', { x: sx, y: ly + 34, width: 4, height: 30, fill: C.accent }, lg);
+    text(lg, 'one pass checks all', sx + 20, ly + 58, 24, { mono: true, fill: C.muted });
+    text(lg, `real time · ${D.machine.replace('MacBook Pro, ', 'MacBook, ')}`, sx, ly + 112, 20, { mono: true, fill: C.faint });
+  },
+  update(t, ctx) {
+    const { rowA, rowB, pos, steps, T, D } = ctx;
+    set(ctx.head, { opacity: win(t, 0, Infinity, 0.4) });
+    set(ctx.rowA.g, { opacity: tw(t, 0.2, 0.6, ease.out) });
+    set(ctx.rowB.g, { opacity: tw(t, 0.3, 0.7, ease.out) });
+    set(ctx.stat, { opacity: tw(t, 2.6, 3.2, ease.out) });
+    set(ctx.legend, { opacity: tw(t, 1.2, 1.7, ease.out) });
+    const scrollFor = (n) => {
+      const ln = n > 0 ? pos[Math.min(n, pos.length) - 1].line : 0;
+      return Math.max(0, ln - 2) * LH;
+    };
+
+    // row A: one token at a time
+    const nA = clamp(Math.floor((t - T_START) * D.base_tps) + 1, 0, pos.length);
+    rowA.ws.forEach((e, i) => set(e, { opacity: i < nA ? 1 : 0 }));
+    const sA = scrollFor(nA);
+    set(rowA.inner, { transform: `translate(0 ${-sA})` });
+    if (nA > 0) {
+      const p = pos[nA - 1];
+      set(ctx.cursor, { x: 120 + p.x + p.w + 6, y: rowA.y0 - FS * 0.8 + p.line * LH, opacity: Math.floor(t * 2.5) % 2 ? 0.9 : 0.25 });
+    }
+
+    // row B: draft 3, check in one pass, keep the agreed ones + one token of its own
+    let cur = steps[0];
+    for (const s of steps) if (t >= s.t0) cur = s;
+    const phi = clamp((t - cur.t0) / T, 0, 1);
+    const started = t >= steps[0].t0;
+    const committed = !started ? 0 : phi >= 0.62 ? cur.from + cur.k + 1 : cur.from;
+    rowB.ws.forEach((e, i) => set(e, { opacity: i < Math.min(committed, pos.length) ? 1 : 0 }));
+    const sB = scrollFor(Math.min(cur.from + 3, pos.length));
+    set(rowB.inner, { transform: `translate(0 ${-sB})` });
+    const yOf = (i) => rowB.y0 + pos[i].line * LH;
+    ctx.ghosts.forEach((gh, j) => {
+      const i = cur.from + j;
+      const show = started && i < pos.length && phi < 0.62;
+      if (!show) return set(gh.g, { opacity: 0 });
+      const wrong = j === cur.k;
+      const word = wrong ? WRONG[Math.floor(hash(i) * WRONG.length)] : D.words[i];
+      const ww = ctx.measure(word);
+      const x = 120 + pos[i].x;
+      const y = yOf(i);
+      const kept = phi >= 0.5 && j < cur.k;
+      set(gh.tx, { text: word, x, y, fill: kept ? C.fg : C.muted });
+      set(gh.ul, { x1: x, y1: y + 10, x2: x + ww, y2: y + 10, opacity: kept ? 0 : 1 });
+      set(gh.st, { x1: x - 2, y1: y - FS * 0.32, x2: x + ww + 2, y2: y - FS * 0.32, opacity: phi >= 0.5 && j >= cur.k ? 1 : 0 });
+      set(gh.g, { opacity: tw(phi, 0.0, 0.12, ease.out) * (j > cur.k && phi >= 0.5 ? 0.35 : 1) });
+    });
+    // the verification sweep across the three drafts, all in one pass
+    if (started && phi >= 0.3 && phi < 0.5) {
+      const i0 = cur.from;
+      const i1 = Math.min(cur.from + 2, pos.length - 1);
+      const k = (phi - 0.3) / 0.2;
+      const a = pos[i0];
+      const b = pos[i1];
+      const sameLine = a.line === b.line;
+      const xa = 120 + a.x;
+      const xb = sameLine ? 120 + b.x + b.w : 120 + a.x + 260;
+      set(ctx.sweep, { x: lerp(xa, xb, ease.inOut(k)), y: yOf(i0) - FS * 0.95, opacity: 1 });
+    } else set(ctx.sweep, { opacity: 0 });
+    // underline the 30B's own token (correction or bonus) just after it lands
+    const ownI = cur.from + cur.k;
+    if (started && phi >= 0.62 && ownI < pos.length) {
+      const p = pos[ownI];
+      set(ctx.own, { x1: 120 + p.x, x2: 120 + p.x + p.w, y1: yOf(ownI) + 10, y2: yOf(ownI) + 10, opacity: 1 - tw(phi, 0.8, 1.0) });
+    } else set(ctx.own, { opacity: 0 });
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>result: the honest result</title>
+<link rel="stylesheet" href="fonts.css">
+<script src="data.js"></script>
+<script src="scene.js"></script>
+</head>
+<body>
+<script>
+// The honest result (results/results.json): mean good materials found with 40 tests, scored blind, for random
+// picks, the random-forest baseline, fortyshots (A5, the accent bar) and the best simple method (MACE-greedy).
+// Faint whiskers: the 95% intervals, drawn without labels.
+const { el, set, text, headline, C, clamp, lerp, ease, tw, win } = Scene;
+const MAXV = 3;
+
+Scene.run({
+  duration: 12,
+  build(ctx) {
+    const { svg, W, H, portrait, data } = ctx;
+    const D = data.result;
+    ctx.D = D;
+    ctx.head = headline(svg, [[['Does it work?', false]], [['Tested fairly, blind.', true]]], portrait ? 80 : 120, portrait ? 230 : 150, portrait ? 76 : 62);
+    const L = portrait
+      ? { x0: 80, x1: 860, rowY: (i) => 470 + i * 215, barH: 64, nameDy: -26, axisY: 1340 }
+      : { x0: 720, x1: 1560, rowY: (i) => 300 + i * 136, barH: 74, nameDy: 0, axisY: 846 };
+    ctx.L = L;
+    const sx = (v) => L.x0 + ((L.x1 - L.x0) * v) / MAXV;
+    ctx.sx = sx;
+    // axis
+    const ax = el('g', {}, svg);
+    ctx.axis = ax;
+    const top = L.rowY(0) - (portrait ? 80 : 50);
+    el('line', { x1: L.x0, y1: top, x2: L.x0, y2: L.axisY - 30, stroke: C.ruleStrong, 'stroke-width': 2 }, ax);
+    for (let v = 1; v <= MAXV; v++) el('line', { x1: sx(v), y1: top, x2: sx(v), y2: L.axisY - 30, stroke: C.rule, 'stroke-width': 1 }, ax);
+    for (let v = 0; v <= MAXV; v++) text(ax, String(v), sx(v), L.axisY, 22, { mono: true, fill: C.muted, anchor: 'middle' });
+    text(ax, `good materials found with ${D.budget} tests`, portrait ? L.x0 : L.x1, L.axisY + 40, 24, { mono: true, fill: C.muted, anchor: portrait ? 'start' : 'end' });
+
+    ctx.rows = D.arms.map((a, i) => {
+      const y = L.rowY(i);
+      const hero = a.arm === 'A5';
+      const g = el('g', {}, svg);
+      const nameX = portrait ? L.x0 : 120;
+      const nameY = portrait ? y + L.nameDy : y + L.barH / 2 - 2;
+      const name = text(g, a.label, nameX, nameY, portrait ? 40 : 40, { fill: hero ? C.accent : C.fg });
+      const note = portrait ? null : text(g, a.note, nameX, nameY + 34, 22, { mono: true, fill: C.muted });
+      const by = portrait ? y : y;
+      const bar = el('rect', { x: L.x0, y: by, width: 0, height: L.barH, fill: hero ? C.accent : '#5c5c5c' }, g);
+      const wy = by + L.barH / 2;
+      const wh = el('g', { stroke: hero ? C.fg : C.fg, 'stroke-width': 2.5, opacity: 0 }, g);
+      el('line', { x1: sx(a.lo), y1: wy, x2: sx(a.hi), y2: wy }, wh);
+      el('line', { x1: sx(a.lo), y1: wy - 12, x2: sx(a.lo), y2: wy + 12 }, wh);
+      el('line', { x1: sx(a.hi), y1: wy - 12, x2: sx(a.hi), y2: wy + 12 }, wh);
+      const val = text(g, '0.0', 0, by + L.barH / 2 + 22, portrait ? 60 : 64, { fill: hero ? C.accent : C.fg, ls: '-0.5px' });
+      return { a, g, name, note, bar, wh, val, y: by, hero };
+    });
+    // annotations
+    ctx.ann = [
+      text(svg, 'ties the ML baseline', 0, 0, 26, { mono: true, fill: C.muted }),
+      text(svg, 'not beaten yet', 0, 0, 26, { mono: true, fill: C.muted }),
+    ];
+    ctx.foot = text(svg, 'set up in advance · scored blind · faint lines: 95% range', portrait ? L.x0 : 120, portrait ? L.axisY + 84 : L.axisY + 40, 22, { mono: true, fill: C.faint });
+  },
+  update(t, ctx) {
+    const { rows, sx, L, portrait } = ctx;
+    set(ctx.head, { opacity: win(t, 0, Infinity, 0.4) });
+    set(ctx.axis, { opacity: tw(t, 0.3, 0.8, ease.out) });
+    set(ctx.foot, { opacity: tw(t, 4.6, 5.2, ease.out) });
+    rows.forEach((r, i) => {
+      const t0 = 0.8 + i * 0.45;
+      const k = tw(t, t0, t0 + 1.1, ease.expo);
+      const v = r.a.mean * k;
+      set(r.g, { opacity: tw(t, t0 - 0.3, t0, ease.out) });
+      set(r.bar, { width: Math.max(0, sx(v) - L.x0).toFixed(1) });
+      // the value sits past the bar end and past the whisker cap
+      const vx = Math.max(sx(v), sx(r.a.hi) * tw(t, t0 + 0.9, t0 + 1.2)) + 26;
+      set(r.val, { text: v.toFixed(1), x: vx, opacity: tw(t, t0, t0 + 0.15) });
+      r.vx = vx;
+      set(r.wh, { opacity: 0.5 * tw(t, t0 + 0.9, t0 + 1.4) });
+    });
+    // emphasis: the fortyshots row stays bright, the others step back a little
+    const em = tw(t, 3.6, 4.2);
+    rows.forEach((r) => set(r.g, { opacity: r.hero ? 1 : 1 - 0.35 * em }));
+    // annotations next to fortyshots (ties) and the best method (still ahead)
+    const fs = rows.find((r) => r.a.arm === 'A5');
+    const best = rows[rows.length - 1];
+    const place = (e, r, dy) => {
+      set(e, { x: r.vx + 130, y: r.y + L.barH / 2 + 9 + dy });
+    };
+    place(ctx.ann[0], fs, 0);
+    place(ctx.ann[1], best, 0);
+    if (portrait) {
+      set(ctx.ann[0], { x: L.x0, y: fs.y + L.barH + 40 });
+      set(ctx.ann[1], { x: L.x0, y: best.y + L.barH + 40 });
+    }
+    set(ctx.ann[0], { opacity: tw(t, 4.2, 4.7, ease.out) });
+    set(ctx.ann[1], { opacity: tw(t, 4.6, 5.1, ease.out) });
+  },
+});
+</script>
+</body>
+</html>
